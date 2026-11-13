@@ -50,7 +50,8 @@ function Restore-Game {
         try {
             $p = Get-Process -Id ([int]$entry.Id) -ErrorAction Stop
             if ($p.ProcessName -eq $entry.Name) {
-                $p.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::$($entry.Priority)
+                $priorityType = [System.Diagnostics.ProcessPriorityClass]
+                $p.PriorityClass = [System.Enum]::Parse($priorityType, [string]$entry.Priority)
                 Write-Host "Restored $($entry.Name) ($($entry.Id))"
             }
         } catch { Write-Warning "Skipped PID $($entry.Id); process exited or changed." }
