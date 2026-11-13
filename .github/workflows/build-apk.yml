@@ -27,20 +27,34 @@ jobs:
         run: gradle --no-daemon assembleDebug
       - name: Verify APK
         run: test -s app/build/outputs/apk/debug/app-debug.apk
+      - name: Name release APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk Crimson-System-Boost-v0.2.0.apk
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: crimson-system-boost-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: crimson-system-boost-v0.2.0
+          path: Crimson-System-Boost-v0.2.0.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Attach APK to existing preview release
+      - name: Publish versioned APK on GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: App
-          files: app/build/outputs/apk/debug/app-debug.apk
-          overwrite_files: true
+          tag_name: v0.2.0
+          target_commitish: main
+          name: Crimson System Boost v0.2.0
+          body: |
+            ## Crimson System Boost v0.2.0
+
+            Native Android utility preview with live device monitoring, installed-app inventory and launcher, Android settings shortcuts, and optional HTTPS Gemini assistant backend.
+
+            ### APK
+            Download **Crimson-System-Boost-v0.2.0.apk** below.
+
+            ### Notes
+            This is a debug-signed preview APK for direct testing/sideloading, not a Play Store production-signed build. VPN firewall, antivirus scanning, quarantine, Shizuku controls, and advanced system tweaks are not included in this version.
+          files: Crimson-System-Boost-v0.2.0.apk
           fail_on_unmatched_files: true
+          draft: false
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
