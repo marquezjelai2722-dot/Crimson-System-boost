@@ -1,49 +1,113 @@
 package com.crimson.boost
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.ActivityManager
+import android.content.ComponentName
 import android.content.Intent
+import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.os.StatFs
-import android.provider.Settings
 import android.view.Gravity
 import android.view.View
-import android.widget.*
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
 import org.json.JSONObject
+import rikka.shizuku.Shizuku
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
-    private val bg = Color.rgb(10, 14, 23)
-    private val panel = Color.rgb(23, 31, 45)
-    private val accent = Color.rgb(255, 76, 91)
-    private val muted = 0xFFADB8C8.toInt()
+    private val bg = Color.rgb(11, 13, 18)
+    private val surface = Color.rgb(20, 25, 34)
+    private val surfaceAlt = Color.rgb(32, 41, 54)
+    private val accent = Color.rgb(198, 40, 61)
+    private val textMain = Color.rgb(230, 234, 240)
+    private val textMuted = Color.rgb(135, 147, 165)
+    private val success = Color.rgb(91, 190, 129)
+    private val warning = Color.rgb(226, 153, 54)
+
     private val executor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var monitorText: TextView
+    private lateinit var shizukuStatus: TextView
     private lateinit var chatLog: TextView
     private lateinit var endpointInput: EditText
     private lateinit var messageInput: EditText
     private var monitorRunning = false
+    private var advancedService: IAdvancedService? = null
+    private var pendingAdvancedAction: ((IAdvancedService) -> String)? = null
+    private var serviceBound = false
+
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+        if (requestCode == SHIZUKU_REQUEST_CODE) {
+            if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                bindAdvancedService()
+            } else {
+                toast("Shizuku permission was not granted.")
+                updateShizukuStatus()
+            }
+        }
+    }
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            advancedService = binder?.let { IAdvancedService.Stub.asInterface(it) }
+            val action = pendingAdvancedAction
+            pendingAdvancedAction = null
+            val service = advancedService
+            if (service != null && action != null) executeAdvanced(action, service)
+            updateShizukuStatus()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            advancedService = null
+            serviceBound = false
+            updateShizukuStatus()
+        }
+    }
+
+    private val userServiceArgs by lazy {
+        Shizuku.UserServiceArgs(
+            ComponentName(packageName, AdvancedUserService::class.java.name)
+        )
+            .daemon(false)
+            .processNameSuffix("crimson_advanced")
+            .debuggable(BuildConfig.DEBUG)
+            .version(BuildConfig.VERSION_CODE)
+    }
 
     private val monitorTick = object : Runnable {
         override fun run() {
             if (!monitorRunning) return
-            monitorText.text = hardwareSummary()
-            handler.postDelayed(this, 2000)
+            if (::monitorText.isInitialized) monitorText.text = hardwareSummary()
+            handler.postDelayed(this, 2500)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        Shizuku.addRequestPermissionResultListener(permissionListener)
         render()
     }
 
@@ -51,6 +115,7 @@ class MainActivity : Activity() {
         super.onResume()
         monitorRunning = true
         if (::monitorText.isInitialized) handler.post(monitorTick)
+        updateShizukuStatus()
     }
 
     override fun onPause() {
@@ -60,6 +125,10 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        Shizuku.removeRequestPermissionResultListener(permissionListener)
+        if (serviceBound) {
+            try { Shizuku.unbindUserService(userServiceArgs, serviceConnection, true) } catch (_: Exception) {}
+        }
         executor.shutdownNow()
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
@@ -68,68 +137,174 @@ class MainActivity : Activity() {
     private fun render() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18, 24, 18, 18)
+            setPadding(dp(18), dp(20), dp(18), dp(18))
             setBackgroundColor(bg)
         }
-        val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(label("CRIMSON / MOBILE UTILITIES", 12, accent))
-        content.addView(label("SYSTEM BOOST", 30, Color.WHITE))
-        content.addView(label("Device tools • gaming dashboard • AI assistant", 13, muted))
-        content.addView(space(12))
-        content.addView(card("DEVICE PROFILE", deviceSummary()))
-        content.addView(label("LIVE HARDWARE MONITOR", 19, Color.WHITE))
-        monitorText = label(hardwareSummary(), 14, Color.WHITE).apply {
-            setPadding(14, 14, 14, 14)
-            setBackgroundColor(panel)
+        val scroll = ScrollView(this).apply { isFillViewport = true }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(12))
         }
-        content.addView(monitorText)
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(ImageView(this).apply {
+            setImageResource(R.drawable.crimson_mark)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+        })
+        val brandText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+        }
+        brandText.addView(label("CRIMSON", 20, textMain, true))
+        brandText.addView(label("SYSTEM CONTROL", 11, textMuted, true))
+        header.addView(brandText)
+        header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        header.addView(label("0.3.0", 11, textMuted, true))
+        content.addView(header)
+        content.addView(space(18))
+        content.addView(label("ANDROID PERFORMANCE UTILITY", 11, accent, true))
+        content.addView(label("System-level tools. Explicit control.", 22, textMain, true))
+        content.addView(label("Local monitoring and permission-gated maintenance. No fake FPS promises.", 13, textMuted))
+        content.addView(space(16))
+
+        content.addView(sectionTitle("DEVICE STATUS"))
+        val statusCard = cardContainer()
+        monitorText = label(hardwareSummary(), 14, textMain).apply {
+            typeface = Typeface.MONOSPACE
+            setLineSpacing(dp(3).toFloat(), 1f)
+        }
+        statusCard.addView(monitorText)
+        content.addView(statusCard)
+        content.addView(space(12))
+
+        content.addView(sectionTitle("ADVANCED CONTROL"))
+        val shizukuCard = cardContainer()
+        shizukuStatus = label("SHIZUKU STATUS: CHECKING", 12, warning, true)
+        shizukuCard.addView(shizukuStatus)
+        shizukuCard.addView(label(
+            "Advanced operations run through Shizuku's UserService with ADB/shell identity. Each action is started manually and reports the system command result.",
+            13, textMuted
+        ))
+        shizukuCard.addView(space(8))
+        shizukuCard.addView(primaryAction("Connect Shizuku") { connectShizuku() })
+        shizukuCard.addView(secondaryAction("Open Shizuku manager") { openShizukuManager() })
+        content.addView(shizukuCard)
         content.addView(space(8))
-        content.addView(label("QUICK TOOLS", 19, Color.WHITE))
-        content.addView(action("Open battery settings") { safeOpen(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)) })
-        content.addView(action("Open display settings") { safeOpen(Intent(Settings.ACTION_DISPLAY_SETTINGS)) })
-        content.addView(action("Open app management") { safeOpen(Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)) })
-        content.addView(action("Open developer options") { safeOpen(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) })
-        content.addView(action("Open storage settings") { safeOpen(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) })
-        content.addView(action("Refresh installed-app inventory") { showInventory() })
-        content.addView(action("Find launchable apps / games") { showLaunchableApps() })
-        content.addView(space(10))
-        content.addView(label("GAMING & PERFORMANCE", 19, Color.WHITE))
-        content.addView(card("GAME MODE", "Use your phone's built-in game mode where available. Crimson provides safe shortcuts and monitoring; it does not claim to overclock the CPU/GPU or force unsupported FPS."))
-        content.addView(card("DISPLAY TOOLS", "Open Android display settings to review refresh-rate options supported by your device. Unsupported refresh rates cannot be created by an app."))
-        content.addView(card("NETWORK / PRIVATE DNS", "Open Network settings to configure Android Private DNS. DNS changes are user-controlled and can be reverted in Settings."))
-        content.addView(action("Open network & internet settings") { safeOpen(Intent(Settings.ACTION_WIRELESS_SETTINGS)) })
-        content.addView(action("Open Private DNS settings") { safeOpen(Intent("android.settings.PRIVATE_DNS_SETTINGS")) })
-        content.addView(card("ADVANCED MODE • SHIZUKU", "Shizuku integration is planned as an optional permission-gated module. No arbitrary shell scripts or destructive system commands are run in this preview."))
-        content.addView(space(10))
-        content.addView(label("CRIMSON AI ASSISTANT", 20, Color.WHITE))
-        content.addView(label("Connect your own HTTPS backend. Keep Gemini keys on the server, never in the APK.", 13, 0xFFFFC66D.toInt()))
+
+        val gameCard = cardContainer()
+        gameCard.addView(label("GAME MODE", 14, textMain, true))
+        gameCard.addView(label(
+            "Request Android GameManager performance mode for one selected game. Availability depends on Android version, OEM support, and whether the package is recognized as a game.",
+            13, textMuted
+        ))
+        gameCard.addView(primaryAction("Set performance mode for a game") { chooseGame { pkg, title ->
+            confirm(
+                "Enable performance mode?",
+                "Crimson will request Android GameManager performance mode for $title. This may increase power use and heat. The device can reject or ignore the request.",
+                "Apply"
+            ) { runAdvanced("Game mode: $title") { it.setGameMode(pkg, "performance") } }
+        } })
+        gameCard.addView(secondaryAction("Restore standard mode for a game") { chooseGame { pkg, title ->
+            confirm(
+                "Restore standard mode?",
+                "This requests Android's standard game mode for $title.",
+                "Restore"
+            ) { runAdvanced("Standard game mode: $title") { it.setGameMode(pkg, "standard") } }
+        } })
+        content.addView(gameCard)
+        content.addView(space(8))
+
+        val maintenanceCard = cardContainer()
+        maintenanceCard.addView(label("SYSTEM CACHE MAINTENANCE", 14, textMain, true))
+        maintenanceCard.addView(label(
+            "Ask Android Package Manager to trim reclaimable application caches until its 256 MB target is met. App data, accounts, photos, and downloads are not targeted. Cached content may be rebuilt later.",
+            13, textMuted
+        ))
+        maintenanceCard.addView(secondaryAction("Review and trim caches") {
+            confirm(
+                "Trim reclaimable caches?",
+                "This affects reclaimable caches across apps. It cannot restore deleted cache files, but it does not request app-data or personal-file deletion.",
+                "Trim caches"
+            ) { runAdvanced("System cache maintenance") { it.trimSystemCaches() } }
+        })
+        content.addView(maintenanceCard)
+        content.addView(space(8))
+
+        val compileCard = cardContainer()
+        compileCard.addView(label("APP RUNTIME OPTIMIZER", 14, textMain, true))
+        compileCard.addView(label(
+            "Request Android Runtime profile-guided compilation for one selected app. This can take time, use storage, or be unsupported; it is not a guaranteed FPS increase.",
+            13, textMuted
+        ))
+        compileCard.addView(secondaryAction("Optimize one app runtime") { chooseGame { pkg, title ->
+            confirm(
+                "Compile $title?",
+                "Android will compile this app using its available speed profile. It may take a while and the system may report that no profile or operation is available.",
+                "Compile"
+            ) { runAdvanced("Runtime compilation: $title") { it.compileSelectedApp(pkg) } }
+        } })
+        content.addView(compileCard)
+        content.addView(space(16))
+
+        content.addView(sectionTitle("APP TOOLS"))
+        val appCard = cardContainer()
+        appCard.addView(label("LOCAL APP LAUNCHER", 14, textMain, true))
+        appCard.addView(label("Browse launchable apps and games without sending the inventory to a server.", 13, textMuted))
+        appCard.addView(secondaryAction("Browse installed launchable apps") { chooseGame { pkg, title ->
+            val launch = packageManager.getLaunchIntentForPackage(pkg)
+            if (launch != null) safeOpen(launch) else toast("$title has no launcher activity.")
+        } })
+        content.addView(appCard)
+        content.addView(space(16))
+
+        content.addView(sectionTitle("CRIMSON ASSISTANT"))
+        val assistantCard = cardContainer()
+        assistantCard.addView(label(
+            "Optional HTTPS backend. Keep provider API keys on the server; never place them in the APK.",
+            13, textMuted
+        ))
         endpointInput = EditText(this).apply {
             hint = "https://your-server.example.com/api/chat"
             setText(getPreferences(MODE_PRIVATE).getString("backend_url", ""))
-            setTextColor(Color.WHITE); setHintTextColor(muted); setSingleLine(true)
+            setTextColor(textMain)
+            setHintTextColor(textMuted)
+            setSingleLine(true)
+            textSize = 13f
+            setBackgroundColor(surfaceAlt)
         }
-        content.addView(endpointInput)
-        content.addView(action("Save assistant server") {
+        assistantCard.addView(endpointInput)
+        assistantCard.addView(secondaryAction("Save assistant endpoint") {
             val value = endpointInput.text.toString().trim()
             if (value.startsWith("https://") && value.endsWith("/api/chat")) {
                 getPreferences(MODE_PRIVATE).edit().putString("backend_url", value).apply()
-                toast("Assistant server saved")
-            } else toast("Use an HTTPS URL ending in /api/chat")
+                toast("HTTPS endpoint saved.")
+            } else toast("Use HTTPS and end the URL with /api/chat.")
         })
-        chatLog = label("Assistant ready when a secure backend URL is configured.", 14, Color.WHITE).apply {
-            setPadding(14, 14, 14, 14); setBackgroundColor(panel)
+        chatLog = label("Assistant idle. Configure an HTTPS backend to enable requests.", 13, textMain).apply {
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setBackgroundColor(surfaceAlt)
         }
-        content.addView(chatLog)
+        assistantCard.addView(chatLog)
         messageInput = EditText(this).apply {
-            hint = "Ask about Android settings or gaming..."
-            setTextColor(Color.WHITE); setHintTextColor(muted); minLines = 2; gravity = Gravity.TOP
+            hint = "Enter a question"
+            setTextColor(textMain)
+            setHintTextColor(textMuted)
+            minLines = 2
+            gravity = Gravity.TOP
+            setBackgroundColor(surfaceAlt)
         }
-        content.addView(messageInput)
-        content.addView(action("Send to Crimson AI") { sendMessage() })
+        assistantCard.addView(messageInput)
+        assistantCard.addView(primaryAction("Send request") { sendMessage() })
+        content.addView(assistantCard)
         content.addView(space(16))
-        content.addView(label("SAFETY", 13, 0xFFFFC66D.toInt()))
-        content.addView(label("No blind system-app removal • no thermal-limit bypass • no guaranteed FPS claims • no hidden API-key storage.", 12, muted))
+        content.addView(label(
+            "SAFETY MODEL  •  No thermal-limit bypass  •  No overclocking  •  No blind package removal  •  No arbitrary shell input",
+            11, textMuted
+        ))
+
         scroll.addView(content)
         root.addView(scroll)
         setContentView(root)
@@ -146,122 +321,263 @@ class MainActivity : Activity() {
         val battery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
         val batteryIntent = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val tempTenths = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
-        val batteryTemp = if (tempTenths >= 0) "${"%.1f".format(tempTenths / 10f)} °C" else "Unavailable"
+        val batteryTemp = if (tempTenths >= 0) "${"%.1f".format(tempTenths / 10f)} °C" else "N/A"
         val charging = when (batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1)) {
-            BatteryManager.BATTERY_STATUS_CHARGING, BatteryManager.BATTERY_STATUS_FULL -> "Charging / full"
-            BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
+            BatteryManager.BATTERY_STATUS_CHARGING, BatteryManager.BATTERY_STATUS_FULL -> "Charging"
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> "On battery"
             BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Not charging"
             else -> "Unknown"
         }
         val refresh = if (Build.VERSION.SDK_INT >= 30) display?.refreshRate ?: 0f else @Suppress("DEPRECATION") windowManager.defaultDisplay.refreshRate
         val usedRam = (memory.totalMem - memory.availMem) / (1024L * 1024L)
         val totalRam = memory.totalMem / (1024L * 1024L)
-        return "RAM: ${usedRam} / ${totalRam} MB\nStorage: ${freeStorage} GB free / ${totalStorage} GB total\nBattery: ${if (battery >= 0) "$battery%" else "Unavailable"}\nDisplay refresh: ${"%.1f".format(refresh)} Hz\nDevice: ${Build.MODEL} • Android ${Build.VERSION.RELEASE}"
+        return "RAM       $usedRam / $totalRam MB\n" +
+            "STORAGE   $freeStorage / $totalStorage GB free\n" +
+            "BATTERY   ${if (battery >= 0) "$battery%" else "N/A"} • $charging\n" +
+            "TEMP      $batteryTemp\n" +
+            "DISPLAY   ${"%.1f".format(refresh)} Hz\n" +
+            "DEVICE    ${Build.MANUFACTURER} ${Build.MODEL}\n" +
+            "ANDROID   ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
     }
 
-    private fun showLaunchableApps() {
-        val pm = packageManager
+    private fun chooseGame(onPick: (String, String) -> Unit) {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val activities = if (Build.VERSION.SDK_INT >= 33) pm.queryIntentActivities(intent, android.content.pm.PackageManager.ResolveInfoFlags.of(0)) else @Suppress("DEPRECATION") pm.queryIntentActivities(intent, 0)
-        val choices = activities.distinctBy { it.activityInfo.packageName }.sortedBy { it.loadLabel(pm).toString().lowercase() }
-        if (choices.isEmpty()) { toast("No launchable apps found"); return }
-        val names = choices.map { it.loadLabel(pm).toString() }.toTypedArray()
-        AlertDialogBuilder.show(this, "Launch an app", names) { index ->
-            val launch = pm.getLaunchIntentForPackage(choices[index].activityInfo.packageName)
-            if (launch != null) safeOpen(launch)
+        val activities: List<ResolveInfo> = if (Build.VERSION.SDK_INT >= 33) {
+            packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.queryIntentActivities(intent, 0)
+        }
+        val choices = activities
+            .filter { it.activityInfo.packageName != packageName }
+            .distinctBy { it.activityInfo.packageName }
+            .sortedBy { it.loadLabel(packageManager).toString().lowercase() }
+        if (choices.isEmpty()) {
+            toast("No launchable apps found.")
+            return
+        }
+        val labels = choices.map { it.loadLabel(packageManager).toString() }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Select an app")
+            .setItems(labels) { _, index ->
+                onPick(choices[index].activityInfo.packageName, labels[index])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirm(title: String, message: String, positive: String, action: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton(positive) { _, _ -> action() }
+            .show()
+    }
+
+    private fun connectShizuku() {
+        if (!Shizuku.pingBinder()) {
+            AlertDialog.Builder(this)
+                .setTitle("Shizuku is not running")
+                .setMessage("Install Shizuku, start its service using Wireless debugging or root, then return here and connect.")
+                .setNegativeButton("Close", null)
+                .setPositiveButton("Download Shizuku") { _, _ ->
+                    safeOpen(Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/download/")))
+                }
+                .show()
+            updateShizukuStatus()
+            return
+        }
+        if (Shizuku.isPreV11()) {
+            toast("This build requires Shizuku API 11 or newer.")
+            return
+        }
+        when (Shizuku.checkSelfPermission()) {
+            PackageManager.PERMISSION_GRANTED -> bindAdvancedService()
+            else -> Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
         }
     }
 
-    private fun showInventory() {
-        try {
-            val pm = packageManager
-            val apps = (if (Build.VERSION.SDK_INT >= 33) {
-                pm.getInstalledApplications(android.content.pm.PackageManager.ApplicationInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getInstalledApplications(0)
-            }).sortedWith(
-                compareBy<android.content.pm.ApplicationInfo> {
-                    (it.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
-                }.thenBy { it.loadLabel(pm).toString().lowercase() }
-            )
-            val labels = apps.map { app ->
-                val kind = if ((app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0) "USER" else "SYSTEM"
-                "${app.loadLabel(pm)} • $kind"
-            }.toTypedArray()
-            android.app.AlertDialog.Builder(this)
-                .setTitle("Installed apps (${apps.size})")
-                .setItems(labels) { _, index ->
-                    val app = apps[index]
-                    val appName = app.loadLabel(pm).toString()
-                    val actions = arrayOf("Launch app", "Open app info", "Cancel")
-                    android.app.AlertDialog.Builder(this)
-                        .setTitle(appName)
-                        .setItems(actions) { _, choice ->
-                            when (choice) {
-                                0 -> {
-                                    val launchIntent = pm.getLaunchIntentForPackage(app.packageName)
-                                    if (launchIntent != null) safeOpen(launchIntent) else toast("This package has no launch screen")
-                                }
-                                1 -> safeOpen(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}")))
-                            }
-                        }.show()
-                }
-                .setNegativeButton("Close", null)
-                .show()
-        } catch (_: Exception) {
-            toast("Android did not allow app inventory access")
+    private fun openShizukuManager() {
+        val launch = packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+        if (launch != null) safeOpen(launch)
+        else safeOpen(Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/download/")))
+    }
+
+    private fun runAdvanced(label: String, action: (IAdvancedService) -> String) {
+        if (!Shizuku.pingBinder()) {
+            toast("Start Shizuku first.")
+            updateShizukuStatus()
+            return
         }
+        if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+            pendingAdvancedAction = action
+            Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
+            return
+        }
+        pendingAdvancedAction = action
+        if (advancedService != null) {
+            val service = advancedService
+            pendingAdvancedAction = null
+            if (service != null) executeAdvanced(action, service)
+        } else {
+            bindAdvancedService()
+            toast("Connecting to Shizuku…")
+        }
+    }
+
+    private fun bindAdvancedService() {
+        if (!Shizuku.pingBinder()) {
+            toast("Shizuku connection was lost.")
+            return
+        }
+        if (advancedService != null) {
+            val action = pendingAdvancedAction
+            pendingAdvancedAction = null
+            if (action != null) executeAdvanced(action, advancedService!!)
+            updateShizukuStatus()
+            return
+        }
+        try {
+            Shizuku.bindUserService(userServiceArgs, serviceConnection)
+            serviceBound = true
+        } catch (error: Exception) {
+            pendingAdvancedAction = null
+            toast("Could not start advanced service: ${error.message ?: "unknown error"}")
+        }
+    }
+
+    private fun executeAdvanced(action: (IAdvancedService) -> String, service: IAdvancedService) {
+        executor.execute {
+            val result = try {
+                action(service)
+            } catch (error: Exception) {
+                "Operation failed: ${error.message ?: error.javaClass.simpleName}"
+            }
+            runOnUiThread {
+                AlertDialog.Builder(this)
+                    .setTitle("System operation result")
+                    .setMessage(result)
+                    .setPositiveButton("Close", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun updateShizukuStatus() {
+        if (!::shizukuStatus.isInitialized) return
+        val state = try {
+            when {
+                !Shizuku.pingBinder() -> "SHIZUKU STATUS: NOT RUNNING"
+                Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED -> "SHIZUKU STATUS: PERMISSION REQUIRED"
+                advancedService != null -> "SHIZUKU STATUS: CONNECTED"
+                else -> "SHIZUKU STATUS: AVAILABLE"
+            }
+        } catch (_: Exception) {
+            "SHIZUKU STATUS: UNAVAILABLE"
+        }
+        shizukuStatus.text = state
+        shizukuStatus.setTextColor(if (state.endsWith("CONNECTED")) success else warning)
     }
 
     private fun sendMessage() {
         val endpoint = endpointInput.text.toString().trim()
         val message = messageInput.text.toString().trim()
-        if (!endpoint.startsWith("https://") || !endpoint.endsWith("/api/chat")) { toast("Save a valid HTTPS server first"); return }
-        if (message.isBlank()) { toast("Type a message first"); return }
+        if (!endpoint.startsWith("https://") || !endpoint.endsWith("/api/chat")) {
+            toast("Save a valid HTTPS backend first.")
+            return
+        }
+        if (message.isBlank()) {
+            toast("Enter a message first.")
+            return
+        }
         messageInput.isEnabled = false
-        val marker = "\nYou: $message\nCrimson: Thinking…"
-        chatLog.append(marker)
+        chatLog.append("\n\nYou: $message\nCrimson: Processing…")
         messageInput.text.clear()
         executor.execute {
             val answer = try {
                 val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"; connectTimeout = 12000; readTimeout = 25000; doOutput = true
+                    requestMethod = "POST"
+                    connectTimeout = 12000
+                    readTimeout = 25000
+                    doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 }
                 try {
                     val payload = JSONObject().put("message", message).toString()
                     connection.outputStream.use { it.write(payload.toByteArray(StandardCharsets.UTF_8)) }
                     val code = connection.responseCode
-                    val body = (if (code in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                        ?.bufferedReader()?.use { it.readText() }.orEmpty()
                     if (code !in 200..299) {
                         val detail = try { JSONObject(body).optString("error", "HTTP $code") } catch (_: Exception) { "HTTP $code" }
                         "Request failed: $detail"
-                    } else JSONObject(body).optString("reply").ifBlank { "The server returned an empty reply." }
-                } finally { connection.disconnect() }
-            } catch (_: Exception) { "Couldn't reach the server. Check your connection and backend URL." }
+                    } else JSONObject(body).optString("reply").ifBlank { "The server returned an empty response." }
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (_: Exception) {
+                "Could not reach the backend. Check the connection and endpoint."
+            }
             runOnUiThread {
-                chatLog.text = chatLog.text.toString().replace("Crimson: Thinking…", "Crimson: $answer")
+                chatLog.append("\n$answer")
                 messageInput.isEnabled = true
             }
         }
     }
 
-    private fun deviceSummary() = "Manufacturer: ${Build.MANUFACTURER}\nModel: ${Build.MODEL}\nDevice: ${Build.DEVICE}\nAndroid: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\nBuild: ${Build.DISPLAY}"
-    private fun safeOpen(intent: Intent) { try { startActivity(intent) } catch (_: Exception) { toast("This settings page is unavailable") } }
-    private fun label(text: String, size: Int, color: Int) = TextView(this).apply { this.text=text; textSize=size.toFloat(); setTextColor(color); setPadding(0,5,0,5) }
-    private fun card(title: String, body: String) = LinearLayout(this).apply {
-        orientation=LinearLayout.VERTICAL; setPadding(15,13,15,13); setBackgroundColor(panel)
-        addView(label(title,14,accent)); addView(label(body,14,Color.WHITE))
-        layoutParams=LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,7,0,7) }
+    private fun cardContainer() = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(14), dp(13), dp(14), dp(13))
+        setBackgroundColor(surface)
+        layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(0, dp(5), 0, dp(5))
+        }
     }
-    private fun action(text: String, run: () -> Unit) = Button(this).apply { this.text=text; setOnClickListener { run() } }
-    private fun space(height: Int) = View(this).apply { layoutParams=LinearLayout.LayoutParams(1,height) }
-    private fun toast(message: String) = Toast.makeText(this,message,Toast.LENGTH_SHORT).show()
-}
 
-private object AlertDialogBuilder {
-    fun show(activity: Activity, title: String, items: Array<String>, onPick: (Int) -> Unit) {
-        android.app.AlertDialog.Builder(activity).setTitle(title).setItems(items) { _, which -> onPick(which) }.setNegativeButton("Cancel", null).show()
+    private fun sectionTitle(value: String) = label(value, 12, textMuted, true).apply {
+        letterSpacing = 0.08f
+        setPadding(0, dp(8), 0, dp(3))
+    }
+
+    private fun label(value: String, size: Int, color: Int, bold: Boolean = false) =
+        TextView(this).apply {
+            text = value
+            textSize = size.toFloat()
+            setTextColor(color)
+            if (bold) typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setPadding(0, dp(4), 0, dp(4))
+        }
+
+    private fun primaryAction(value: String, action: () -> Unit) = Button(this).apply {
+        text = value
+        textSize = 13f
+        isAllCaps = false
+        setTextColor(Color.WHITE)
+        backgroundTintList = ColorStateList.valueOf(accent)
+        setOnClickListener { action() }
+    }
+
+    private fun secondaryAction(value: String, action: () -> Unit) = Button(this).apply {
+        text = value
+        textSize = 13f
+        isAllCaps = false
+        setTextColor(textMain)
+        backgroundTintList = ColorStateList.valueOf(surfaceAlt)
+        setOnClickListener { action() }
+    }
+
+    private fun space(height: Int) = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(1, dp(height))
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun safeOpen(intent: Intent) {
+        try { startActivity(intent) } catch (_: Exception) { toast("Unable to open this destination.") }
+    }
+    private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+
+    companion object {
+        private const val SHIZUKU_REQUEST_CODE = 4107
     }
 }
