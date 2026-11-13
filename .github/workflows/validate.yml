@@ -56,15 +56,11 @@ jobs:
       - name: Parse PowerShell script
         shell: pwsh
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $PWD "windows/Crimson-Windows.ps1"),
-            [ref]$tokens,
-            [ref]$errors
-          ) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.Message }
-            exit 1
+          $files = @("windows/Crimson-Windows.ps1", "windows/Crimson-Windows-GUI.ps1")
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error "$file`: $($_.Message)" }; exit 1 }
+            Write-Host "$file syntax is valid."
           }
-          Write-Host "PowerShell syntax is valid."
