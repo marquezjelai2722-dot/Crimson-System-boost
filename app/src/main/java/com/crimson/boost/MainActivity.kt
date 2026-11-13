@@ -11,6 +11,7 @@ import android.content.pm.ResolveInfo
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
@@ -39,14 +40,15 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
-    private val bg = Color.rgb(11, 13, 18)
-    private val surface = Color.rgb(20, 25, 34)
-    private val surfaceAlt = Color.rgb(32, 41, 54)
-    private val accent = Color.rgb(198, 40, 61)
-    private val textMain = Color.rgb(230, 234, 240)
-    private val textMuted = Color.rgb(135, 147, 165)
-    private val success = Color.rgb(91, 190, 129)
-    private val warning = Color.rgb(226, 153, 54)
+    private val bg = Color.rgb(10, 8, 14)
+    private val surface = Color.rgb(22, 17, 27)
+    private val surfaceAlt = Color.rgb(33, 26, 39)
+    private val accent = Color.rgb(255, 59, 82)
+    private val accentCool = Color.rgb(56, 217, 255)
+    private val textMain = Color.rgb(245, 241, 246)
+    private val textMuted = Color.rgb(174, 164, 180)
+    private val success = Color.rgb(91, 205, 132)
+    private val warning = Color.rgb(242, 177, 77)
 
     private val executor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
@@ -180,13 +182,26 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), 0, 0, 0)
         }
-        brandText.addView(label("CRIMSON", 20, textMain, true))
-        brandText.addView(label("SYSTEM CONTROL", 11, textMuted, true))
+        brandText.addView(label("CRIMSON", 21, textMain, true))
+        brandText.addView(label("SYSTEM BOOST  /  DEVICE CONTROL", 10, textMuted, true))
         header.addView(brandText)
         header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         header.addView(label("0.3.0", 11, textMuted, true))
         content.addView(header)
         content.addView(space(18))
+
+        val heroCard = cardContainer()
+        heroCard.addView(label("CRIMSON  /  PERFORMANCE CONSOLE", 11, accentCool, true))
+        heroCard.addView(label("Play better. Run smoother.", 23, textMain, true))
+        heroCard.addView(label("Real device telemetry and permission-gated controls. No fake FPS promises.", 13, textMuted))
+        val heroMeta = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        heroMeta.addView(label("●  LIVE DEVICE MONITOR", 10, success, true))
+        heroMeta.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        heroMeta.addView(label("ANDROID  /  0.3.0", 10, textMuted, true))
+        heroCard.addView(space(5))
+        heroCard.addView(heroMeta)
+        content.addView(heroCard)
+        content.addView(space(12))
         content.addView(label("ANDROID PERFORMANCE UTILITY", 11, accent, true))
         content.addView(label("System-level tools. Explicit control.", 22, textMain, true))
         content.addView(label("Local monitoring and permission-gated maintenance. No fake FPS promises.", 13, textMuted))
@@ -295,7 +310,8 @@ class MainActivity : Activity() {
             setHintTextColor(textMuted)
             setSingleLine(true)
             textSize = 13f
-            setBackgroundColor(surfaceAlt)
+            background = roundedBackground(surfaceAlt, Color.rgb(75, 55, 70), 12)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
         }
         assistantCard.addView(endpointInput)
         assistantCard.addView(secondaryAction("Save assistant endpoint") {
@@ -307,7 +323,7 @@ class MainActivity : Activity() {
         })
         chatLog = label("Assistant idle. Configure an HTTPS backend to enable requests.", 13, textMain).apply {
             setPadding(dp(10), dp(10), dp(10), dp(10))
-            setBackgroundColor(surfaceAlt)
+            background = roundedBackground(surfaceAlt, Color.rgb(75, 55, 70), 12)
         }
         assistantCard.addView(chatLog)
         messageInput = EditText(this).apply {
@@ -554,12 +570,25 @@ class MainActivity : Activity() {
 
     private fun cardContainer() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(13), dp(14), dp(13))
-        setBackgroundColor(surface)
+        setPadding(dp(16), dp(15), dp(16), dp(15))
+        background = roundedBackground(surface, Color.rgb(62, 43, 58), 18)
+        elevation = dp(3).toFloat()
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-            setMargins(0, dp(5), 0, dp(5))
+            setMargins(0, dp(6), 0, dp(6))
         }
     }
+
+    private fun roundedBackground(fill: Int, stroke: Int, radiusDp: Int) =
+        GradientDrawable().apply {
+            setColor(fill)
+            cornerRadius = dp(radiusDp).toFloat()
+            if (stroke != Color.TRANSPARENT) setStroke(dp(1), stroke)
+        }
+
+    private fun accentBackground() = GradientDrawable(
+        GradientDrawable.Orientation.LEFT_RIGHT,
+        intArrayOf(Color.rgb(255, 76, 94), Color.rgb(190, 25, 61))
+    ).apply { cornerRadius = dp(14).toFloat() }
 
     private fun sectionTitle(value: String) = label(value, 12, textMuted, true).apply {
         letterSpacing = 0.08f
@@ -577,10 +606,14 @@ class MainActivity : Activity() {
 
     private fun primaryAction(value: String, action: () -> Unit) = Button(this).apply {
         text = value
-        textSize = 13f
+        textSize = 14f
         isAllCaps = false
+        typeface = Typeface.create("sans-serif", Typeface.BOLD)
         setTextColor(Color.WHITE)
-        backgroundTintList = ColorStateList.valueOf(accent)
+        background = accentBackground()
+        minHeight = dp(48)
+        setPadding(dp(16), dp(10), dp(16), dp(10))
+        stateListAnimator = null
         setOnClickListener { action() }
     }
 
@@ -588,8 +621,12 @@ class MainActivity : Activity() {
         text = value
         textSize = 13f
         isAllCaps = false
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         setTextColor(textMain)
-        backgroundTintList = ColorStateList.valueOf(surfaceAlt)
+        background = roundedBackground(surfaceAlt, Color.rgb(77, 59, 77), 13)
+        minHeight = dp(46)
+        setPadding(dp(14), dp(9), dp(14), dp(9))
+        stateListAnimator = null
         setOnClickListener { action() }
     }
 
