@@ -146,10 +146,11 @@ class MainActivity : Activity() {
         val rootTop = dp(20)
         val rootRight = dp(18)
         val rootBottom = dp(18)
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val root = FrameLayout(this).apply {
             setPadding(rootLeft, rootTop, rootRight, rootBottom)
             setBackgroundColor(bg)
+            clipChildren = false
+            clipToPadding = false
         }
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -343,8 +344,32 @@ class MainActivity : Activity() {
         ))
 
         scroll.addView(content)
-        root.addView(scroll)
+        root.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+        val mascot = CrimsonMascotView(this).apply {
+            contentDescription = "Crimson mascot. Drag to move, tap for tutorial."
+            elevation = dp(18).toFloat()
+            setOnClickListener { showMascotTutorial() }
+        }
+        val mascotParams = FrameLayout.LayoutParams(dp(104), dp(150), Gravity.BOTTOM or Gravity.END).apply {
+            rightMargin = dp(12)
+            bottomMargin = dp(20)
+        }
+        root.addView(mascot, mascotParams)
         setContentView(root)
+        if (!getPreferences(MODE_PRIVATE).getBoolean("mascot_tutorial_seen", false)) {
+            handler.postDelayed({ if (!isFinishing) showMascotTutorial() }, 700)
+        }
+    }
+
+    private fun showMascotTutorial() {
+        AlertDialog.Builder(this)
+            .setTitle("Meet your Crimson Guardian")
+            .setMessage("1. Drag the mascot with your finger to move it.\n\n2. Release it to see its landing animation.\n\n3. Tap the mascot any time to reopen this tutorial.\n\nDuring a future verified file scan, the guardian can hold its folder while checking files. This build does not yet scan for malware.")
+            .setPositiveButton("Got it") { _, _ ->
+                getPreferences(MODE_PRIVATE).edit().putBoolean("mascot_tutorial_seen", true).apply()
+            }
+            .setNegativeButton("Later", null)
+            .show()
     }
 
     private fun hardwareSummary(): String {
