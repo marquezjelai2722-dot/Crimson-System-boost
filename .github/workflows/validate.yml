@@ -3,6 +3,8 @@ name: Build and syntax validation
 on:
   pull_request:
     branches: ["main"]
+  push:
+    branches: ["feature/security-cross-platform-fps"]
   workflow_dispatch:
 
 permissions:
