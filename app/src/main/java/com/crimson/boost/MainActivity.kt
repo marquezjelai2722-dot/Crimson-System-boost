@@ -356,8 +356,8 @@ class MainActivity : Activity() {
             bottomMargin = dp(20)
         }
         mascot.setOnLongClickListener {
-            mascot.setFolderPose(true)
-            toast("Folder pose preview. File scanning is not implemented yet.")
+            mascot.setFolderPose(!mascot.isFolderPose())
+            toast(if (mascot.isFolderPose()) "Inspection pose preview." else "Idle pose.")
             true
         }
         root.addView(mascot, mascotParams)
@@ -370,7 +370,7 @@ class MainActivity : Activity() {
     private fun showMascotTutorial() {
         AlertDialog.Builder(this)
             .setTitle("Meet your Crimson Guardian")
-            .setMessage("1. Drag the mascot with your finger to move it.\n\n2. Release it to see its landing animation.\n\n3. Tap the mascot any time to reopen this tutorial.\n\nDuring a future verified file scan, the guardian can hold its folder while checking files. This build does not yet scan for malware.")
+            .setMessage("DRAG  — Move the guardian anywhere inside the app.\n\nRELEASE  — It settles with a restrained landing motion.\n\nTAP  — Reopen this guide.\n\nHOLD  — Preview the inspection-folder pose.\n\nThe guardian uses a compact chibi silhouette with a serious masked design. File scanning is not connected in this build.")
             .setPositiveButton("Got it") { _, _ ->
                 getPreferences(MODE_PRIVATE).edit().putBoolean("mascot_tutorial_seen", true).apply()
             }
