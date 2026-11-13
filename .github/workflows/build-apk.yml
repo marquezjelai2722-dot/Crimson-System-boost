@@ -28,31 +28,39 @@ jobs:
       - name: Verify APK
         run: test -s app/build/outputs/apk/debug/app-debug.apk
       - name: Name release APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Crimson-System-Boost-v0.2.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Crimson-System-Boost-v0.3.0.apk
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: crimson-system-boost-v0.2.0
-          path: Crimson-System-Boost-v0.2.0.apk
+          name: crimson-system-boost-v0.3.0
+          path: Crimson-System-Boost-v0.3.0.apk
           if-no-files-found: error
           retention-days: 14
       - name: Publish versioned APK on GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.0
+          tag_name: v0.3.0
           target_commitish: main
-          name: Crimson System Boost v0.2.0
+          name: Crimson System Boost v0.3.0
           body: |
-            ## Crimson System Boost v0.2.0
+            ## Crimson System Boost v0.3.0
 
-            Native Android utility preview with live device monitoring, installed-app inventory and launcher, Android settings shortcuts, and optional HTTPS Gemini assistant backend.
+            Professional dark UI refresh and optional Shizuku-powered advanced controls.
 
-            ### APK
-            Download **Crimson-System-Boost-v0.2.0.apk** below.
+            ### Included
+            - Live device and battery monitoring.
+            - Local app/game launcher.
+            - Shizuku UserService integration with explicit permission request.
+            - Android GameManager performance/standard mode requests for a selected app.
+            - Package Manager reclaimable cache trim.
+            - ART speed-profile compilation request for one selected app.
+            - Original Crimson vector logo and updated dashboard.
 
-            ### Notes
-            This is a debug-signed preview APK for direct testing/sideloading, not a Play Store production-signed build. VPN firewall, antivirus scanning, quarantine, Shizuku controls, and advanced system tweaks are not included in this version.
-          files: Crimson-System-Boost-v0.2.0.apk
+            ### Safety and compatibility
+            Advanced actions require Shizuku and are manually confirmed. The app exposes only fixed allow-listed operations; it does not accept arbitrary shell commands. Android/OEM support varies, and no FPS or performance increase is guaranteed. Cache trimming and app compilation may consume resources or require apps to rebuild cached data.
+
+            This is a debug-signed preview APK for direct testing, not a Play Store production-signed build.
+          files: Crimson-System-Boost-v0.3.0.apk
           fail_on_unmatched_files: true
           draft: false
           prerelease: true
