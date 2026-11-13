@@ -10,33 +10,43 @@ on:
 permissions:
   contents: read
 
-jobs:
-  codeql:
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ["java-kotlin", "javascript-typescript"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
-  dependency-review:
-    if: github.event_name == 'pull_request'
+jobs:
+  secret-scan:
+    name: Secret scanning
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - name: Check out full history
+        uses: actions/checkout@v4
         with:
-          fail-on-severity: high
+          fetch-depth: 0
+      - name: Scan for exposed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+
+  filesystem-security:
+    name: Dependency and configuration scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Scan dependencies, secrets, and configuration
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
