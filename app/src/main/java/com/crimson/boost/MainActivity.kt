@@ -351,6 +351,9 @@ class MainActivity : Activity() {
             else -> "Unknown"
         }
         val refresh = if (Build.VERSION.SDK_INT >= 30) display?.refreshRate ?: 0f else @Suppress("DEPRECATION") windowManager.defaultDisplay.refreshRate
+        val supportedRefreshRates = if (Build.VERSION.SDK_INT >= 23) {
+            (display?.supportedModes ?: emptyArray()).map { it.refreshRate.toInt() }.distinct().sorted().joinToString(", ")
+        } else ""
         val usedRam = (memory.totalMem - memory.availMem) / (1024L * 1024L)
         val totalRam = memory.totalMem / (1024L * 1024L)
         return "RAM       $usedRam / $totalRam MB\n" +
@@ -358,6 +361,7 @@ class MainActivity : Activity() {
             "BATTERY   ${if (battery >= 0) "$battery%" else "N/A"} • $charging\n" +
             "TEMP      $batteryTemp\n" +
             "DISPLAY   ${"%.1f".format(refresh)} Hz\n" +
+            (if (supportedRefreshRates.isNotBlank()) "MODES     ${supportedRefreshRates} Hz\n" else "") +
             "DEVICE    ${Build.MANUFACTURER} ${Build.MODEL}\n" +
             "ANDROID   ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
     }
