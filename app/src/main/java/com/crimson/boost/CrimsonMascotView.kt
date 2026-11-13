@@ -76,9 +76,9 @@ class CrimsonMascotView(context: Context) : View(context) {
 
     private fun playDropReaction() {
         animate().cancel()
-        animate().rotation(11f).translationY(y + 22f).setDuration(170).withEndAction {
-            animate().rotation(0f).translationY(y - 22f).setDuration(230).withEndAction {
-                animate().translationY(y).setDuration(120).start()
+        animate().rotation(11f).translationY(22f).setDuration(170).withEndAction {
+            animate().rotation(0f).translationY(0f).setDuration(230).withEndAction {
+                animate().translationY(0f).setDuration(120).start()
             }.start()
         }.start()
     }
