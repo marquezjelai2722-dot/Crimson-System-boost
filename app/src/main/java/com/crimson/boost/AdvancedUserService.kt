@@ -23,7 +23,7 @@ class AdvancedUserService : IAdvancedService.Stub() {
 
     override fun trimSystemCaches(): String {
         // Trims reclaimable app caches; it does not clear app data or user files.
-        return execute(listOf("/system/bin/pm", "trim-caches", "256M"), 90)
+        return execute(listOf("/system/bin/pm", "trim-caches", "268435456"), 90)
     }
 
     override fun compileSelectedApp(packageName: String): String {
