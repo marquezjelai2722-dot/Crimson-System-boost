@@ -99,6 +99,7 @@ class MainActivity : Activity() {
         content.addView(card("DISPLAY TOOLS", "Open Android display settings to review refresh-rate options supported by your device. Unsupported refresh rates cannot be created by an app."))
         content.addView(card("NETWORK / PRIVATE DNS", "Open Network settings to configure Android Private DNS. DNS changes are user-controlled and can be reverted in Settings."))
         content.addView(action("Open network & internet settings") { safeOpen(Intent(Settings.ACTION_WIRELESS_SETTINGS)) })
+        content.addView(action("Open Private DNS settings") { safeOpen(Intent("android.settings.PRIVATE_DNS_SETTINGS")) })
         content.addView(card("ADVANCED MODE • SHIZUKU", "Shizuku integration is planned as an optional permission-gated module. No arbitrary shell scripts or destructive system commands are run in this preview."))
         content.addView(space(10))
         content.addView(label("CRIMSON AI ASSISTANT", 20, Color.WHITE))
@@ -141,8 +142,17 @@ class MainActivity : Activity() {
         val stat = StatFs(filesDir.absolutePath)
         val totalStorage = stat.totalBytes / (1024L * 1024L * 1024L)
         val freeStorage = stat.availableBytes / (1024L * 1024L * 1024L)
-        val battery = (getSystemService(BATTERY_SERVICE) as BatteryManager)
-            .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        val batteryManager = getSystemService(BATTERY_SERVICE) as BatteryManager
+        val battery = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        val batteryIntent = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val tempTenths = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
+        val batteryTemp = if (tempTenths >= 0) "${"%.1f".format(tempTenths / 10f)} °C" else "Unavailable"
+        val charging = when (batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1)) {
+            BatteryManager.BATTERY_STATUS_CHARGING, BatteryManager.BATTERY_STATUS_FULL -> "Charging / full"
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Not charging"
+            else -> "Unknown"
+        }
         val refresh = if (Build.VERSION.SDK_INT >= 30) display?.refreshRate ?: 0f else @Suppress("DEPRECATION") windowManager.defaultDisplay.refreshRate
         val usedRam = (memory.totalMem - memory.availMem) / (1024L * 1024L)
         val totalRam = memory.totalMem / (1024L * 1024L)
@@ -165,10 +175,43 @@ class MainActivity : Activity() {
     private fun showInventory() {
         try {
             val pm = packageManager
-            val apps = if (Build.VERSION.SDK_INT >= 33) pm.getInstalledApplications(android.content.pm.PackageManager.ApplicationInfoFlags.of(0)) else @Suppress("DEPRECATION") pm.getInstalledApplications(0)
-            val userApps = apps.count { (it.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0 }
-            Toast.makeText(this, "${apps.size} visible packages • ${userApps} user apps", Toast.LENGTH_LONG).show()
-        } catch (_: Exception) { toast("Android did not allow app inventory access") }
+            val apps = (if (Build.VERSION.SDK_INT >= 33) {
+                pm.getInstalledApplications(android.content.pm.PackageManager.ApplicationInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstalledApplications(0)
+            }).sortedWith(
+                compareBy<android.content.pm.ApplicationInfo> {
+                    (it.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                }.thenBy { it.loadLabel(pm).toString().lowercase() }
+            )
+            val labels = apps.map { app ->
+                val kind = if ((app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0) "USER" else "SYSTEM"
+                "${app.loadLabel(pm)} • $kind"
+            }.toTypedArray()
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Installed apps (${apps.size})")
+                .setItems(labels) { _, index ->
+                    val app = apps[index]
+                    val appName = app.loadLabel(pm).toString()
+                    val actions = arrayOf("Launch app", "Open app info", "Cancel")
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle(appName)
+                        .setItems(actions) { _, choice ->
+                            when (choice) {
+                                0 -> {
+                                    val launchIntent = pm.getLaunchIntentForPackage(app.packageName)
+                                    if (launchIntent != null) safeOpen(launchIntent) else toast("This package has no launch screen")
+                                }
+                                1 -> safeOpen(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}")))
+                            }
+                        }.show()
+                }
+                .setNegativeButton("Close", null)
+                .show()
+        } catch (_: Exception) {
+            toast("Android did not allow app inventory access")
+        }
     }
 
     private fun sendMessage() {
