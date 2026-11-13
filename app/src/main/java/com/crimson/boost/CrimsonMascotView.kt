@@ -56,13 +56,18 @@ class CrimsonMascotView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_UP -> {
                 parentView?.requestDisallowInterceptTouchEvent(false)
-                if (moved) playDropReaction()
-                else performClick()
+                if (moved) {
+                    moved = false
+                    playDropReaction()
+                } else performClick()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
                 parentView?.requestDisallowInterceptTouchEvent(false)
-                if (moved) playDropReaction()
+                if (moved) {
+                    moved = false
+                    playDropReaction()
+                }
                 return true
             }
         }
@@ -114,17 +119,18 @@ class CrimsonMascotView(context: Context) : View(context) {
         block(canvas, 77f, 23f, 5f, 8f, orange)
 
         // Hooded torso and angular armor.
+        val stride = if (moved) kotlin.math.sin(walkingPhase.toDouble()).toFloat() * 5f else 0f
         block(canvas, 28f, 56f, 58f, 48f, black)
         block(canvas, 21f, 62f, 14f, 39f, dark)
         block(canvas, 79f, 62f, 14f, 39f, dark)
         block(canvas, 34f, 59f, 46f, 35f, mid)
         block(canvas, 39f, 68f, 35f, 29f, dark)
-        block(canvas, 29f, 99f, 24f, 45f, black)
-        block(canvas, 59f, 99f, 24f, 45f, black)
-        block(canvas, 34f, 104f, 12f, 34f, dark)
-        block(canvas, 65f, 104f, 12f, 34f, dark)
-        block(canvas, 28f, 139f, 27f, 8f, black)
-        block(canvas, 57f, 139f, 29f, 8f, black)
+        block(canvas, 29f + stride, 99f, 24f, 45f, black)
+        block(canvas, 59f - stride, 99f, 24f, 45f, black)
+        block(canvas, 34f + stride, 104f, 12f, 34f, dark)
+        block(canvas, 65f - stride, 104f, 12f, 34f, dark)
+        block(canvas, 28f + stride, 139f, 27f, 8f, black)
+        block(canvas, 57f - stride, 139f, 29f, 8f, black)
 
         // Chunky sleeves and crossed forearms.
         block(canvas, 15f, 63f, 22f, 14f, dark)
