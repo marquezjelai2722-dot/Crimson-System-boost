@@ -28,6 +28,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 import rikka.shizuku.Shizuku
 import java.net.HttpURLConnection
@@ -107,6 +110,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = bg
         window.navigationBarColor = bg
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = false
         Shizuku.addRequestPermissionResultListener(permissionListener)
         render()
     }
@@ -135,11 +141,27 @@ class MainActivity : Activity() {
     }
 
     private fun render() {
+        val rootLeft = dp(18)
+        val rootTop = dp(20)
+        val rootRight = dp(18)
+        val rootBottom = dp(18)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(20), dp(18), dp(18))
+            setPadding(rootLeft, rootTop, rootRight, rootBottom)
             setBackgroundColor(bg)
         }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            view.setPadding(
+                rootLeft + bars.left,
+                rootTop + bars.top,
+                rootRight + bars.right,
+                rootBottom + maxOf(bars.bottom, ime.bottom)
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
