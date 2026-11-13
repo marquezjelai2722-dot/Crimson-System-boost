@@ -355,6 +355,11 @@ class MainActivity : Activity() {
             rightMargin = dp(12)
             bottomMargin = dp(20)
         }
+        mascot.setOnLongClickListener {
+            mascot.setFolderPose(true)
+            toast("Folder pose preview. File scanning is not implemented yet.")
+            true
+        }
         root.addView(mascot, mascotParams)
         setContentView(root)
         if (!getPreferences(MODE_PRIVATE).getBoolean("mascot_tutorial_seen", false)) {
