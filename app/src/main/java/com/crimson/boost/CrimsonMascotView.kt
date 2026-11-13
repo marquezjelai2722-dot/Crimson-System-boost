@@ -185,6 +185,8 @@ class CrimsonMascotView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun isFolderPose(): Boolean = folderPose
+
     private fun block(canvas: Canvas, left: Float, top: Float, width: Float, height: Float, color: Int) {
         paint.color = color
         paint.style = Paint.Style.FILL
