@@ -26,12 +26,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.9"
-      - name: Build debug APK
+      - name: Build installable APK
         run: gradle --no-daemon assembleDebug
-      - name: Upload installable debug APK
+      - name: Upload installable APK
         uses: actions/upload-artifact@v7
         with:
-          name: Crimson-System-Boost-debug-apk
+          name: Crimson-System-Boost-Android-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -48,12 +48,12 @@ jobs:
       - name: Check backend syntax
         run: node --check backend/server.js
 
-  windows-script:
+  windows-exe:
     runs-on: windows-2025
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: Parse PowerShell script
+      - name: Parse PowerShell sources
         shell: pwsh
         run: |
           $files = @("windows/Crimson-Windows.ps1", "windows/Crimson-Windows-GUI.ps1")
@@ -61,6 +61,23 @@ jobs:
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file), [ref]$tokens, [ref]$errors) | Out-Null
-            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error "$file`: $($_.Message)" }; exit 1 }
+            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error "$($file): $($_.Message)" }; exit 1 }
             Write-Host "$file syntax is valid."
           }
+      - name: Install PS2EXE
+        shell: pwsh
+        run: Install-Module ps2exe -Scope CurrentUser -Force -AllowClobber
+      - name: Package Windows GUI executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          Invoke-PS2EXE -inputFile "windows/Crimson-Windows-GUI.ps1" -outputFile "dist/Crimson-System-Boost-Windows.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
+          if (-not (Test-Path "dist/Crimson-System-Boost-Windows.exe")) { throw "EXE packaging did not produce an output file." }
+          if ((Get-Item "dist/Crimson-System-Boost-Windows.exe").Length -lt 100KB) { throw "EXE output is unexpectedly small." }
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v7
+        with:
+          name: Crimson-System-Boost-Windows-EXE
+          path: dist/Crimson-System-Boost-Windows.exe
+          if-no-files-found: error
+          retention-days: 30
