@@ -1,0 +1,80 @@
+name: Publish Crimson System Boost release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (for example v0.3.1)"
+        required: true
+        default: "v0.3.1"
+      prerelease:
+        description: "Mark this release as a prerelease"
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.9"
+      - name: Build Android APK
+        run: gradle --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install PS2EXE
+        shell: pwsh
+        run: Install-Module ps2exe -Scope CurrentUser -Force -AllowClobber
+      - name: Build Windows EXE
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          Invoke-PS2EXE -inputFile "windows/Crimson-Windows-GUI.ps1" -outputFile "dist/Crimson-System-Boost-Windows.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
+          $exe = Get-Item "dist/Crimson-System-Boost-Windows.exe"
+          if ($exe.Length -le 0) { throw "EXE output is empty." }
+          $stream = [System.IO.File]::OpenRead($exe.FullName)
+          try { $mz = New-Object byte[] 2; [void]$stream.Read($mz, 0, 2) } finally { $stream.Dispose() }
+          if ([System.Text.Encoding]::ASCII.GetString($mz) -ne "MZ") { throw "EXE does not have a valid Windows PE signature." }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-exe
+          path: dist/Crimson-System-Boost-Windows.exe
+          if-no-files-found: error
+
+  publish:
+    needs: [build, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: android-apk
+          path: release-assets
+      - uses: actions/download-artifact@v7
+        with:
+          name: windows-exe
+          path: release-assets
+      - name: Create GitHub release and attach both builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.tag_name }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          gh release create "$TAG_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --title "Crimson System Boost $TAG_NAME" --notes "Android APK and Windows desktop EXE. Android APK is debug-signed for sideload testing. Windows EXE is unsigned; Windows SmartScreen may show a warning. Review the source and permissions before installing." $( [ "$PRERELEASE" = "true" ] && printf '%s' --prerelease )
