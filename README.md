@@ -2,9 +2,9 @@
 
 Crimson System Boost is a safety-first performance toolkit for Android phones/tablets and Windows PCs/laptops. It combines local diagnostics, reversible gaming profiles, safe cleanup, security checks, and optional assistant support.
 
-## Current Android app (v0.3.0 baseline)
+## Current Android app (v0.4.1 rebuild preview)
 - Live RAM, storage, battery, charging state, battery temperature, display refresh rate, device model and Android version.
-- Local launcher for installed apps and games.
+- Local launcher plus installed-app inventory (system/user classification and APK footprint; security verdict remains NOT SCANNED).\n- OS-scheduled 24-hour inventory metadata refresh via WorkManager; this is not a background antivirus scanner.\n- Mascot-led startup/loading screen with the folder-inspection pose; display settings shortcut.
 - Optional HTTPS assistant backend; provider API keys remain server-side.
 - Optional Shizuku operations with explicit permission and confirmation:
   - Android GameManager performance/standard mode requests for a selected game.
@@ -13,7 +13,7 @@ Crimson System Boost is a safety-first performance toolkit for Android phones/ta
 
 ## Cross-platform direction
 - **Android:** native app with hardware/display diagnostics and supported GameManager requests.
-- **Windows PCs and laptops:** PowerShell companion for hardware/display diagnostics, reversible game-process priority profiles, restore, and safe temporary-file cleanup.
+- **Windows PCs and laptops:** modular PowerShell companion with installed-software inventory, top memory-use report, Microsoft Defender status/full-scan adapter, display/power settings shortcuts, reversible game-process priority profiles, and preview-first temporary-file cleanup.
 - **Shared FPS dashboard direction:** distinguish display refresh rate (Hz), game FPS, and frame pacing. Supported settings only; no universal cap bypass is possible.
 
 ### Windows companion
@@ -25,7 +25,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 ```
 
 Actions: `-Action Scan`, `Boost`, `Restore`, `CleanPreview`, or `Clean`.
-Boost requests AboveNormal priority for a selected visible process and saves its previous priority. Cleaner targets only files older than seven days in the current user's temp and Windows temp folders; preview first, then type DELETE to confirm. Locked files are skipped.
+Boost requests AboveNormal priority for a selected visible process and saves its previous priority. Cleaner targets only files older than seven days in the current user's temp and Windows temp folders; preview first, then type DELETE to confirm. Locked files are skipped. The Windows GUI reports large installed footprints separately from security status and can request a Microsoft Defender full scan when Defender is available.
 
 ## FPS and safety limits
 Crimson aims for the highest stable FPS supported by hardware, display, OS, and game. It cannot guarantee an FPS increase or universally remove a game's internal frame cap. It does not patch game files, bypass anti-cheat, disable thermal protections, overclock hardware, use Realtime process priority, or run arbitrary shell commands. See [FPS controls](docs/FPS-CONTROL-AND-UNCAPPING.md).
