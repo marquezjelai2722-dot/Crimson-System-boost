@@ -197,7 +197,7 @@ class MainActivity : Activity() {
         brandText.addView(label("SYSTEM BOOST  /  DEVICE CONTROL", 10, textMuted, true))
         header.addView(brandText)
         header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        header.addView(label("0.3.0", 11, textMuted, true))
+        header.addView(label("0.4.0", 11, textMuted, true))
         content.addView(header)
         content.addView(space(18))
 
@@ -208,7 +208,7 @@ class MainActivity : Activity() {
         val heroMeta = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         heroMeta.addView(label("●  LIVE DEVICE MONITOR", 10, success, true))
         heroMeta.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        heroMeta.addView(label("ANDROID  /  0.3.0", 10, textMuted, true))
+        heroMeta.addView(label("ANDROID  /  0.4.0", 10, textMuted, true))
         heroCard.addView(space(5))
         heroCard.addView(heroMeta)
         content.addView(heroCard)
