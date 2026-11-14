@@ -170,6 +170,21 @@ function Invoke-DefenderFullScan {
         Add-Log "Microsoft Defender full scan requested. Check Windows Security for progress and results."
     } catch { Add-Log ("Defender scan request failed: "+$_.Exception.Message) }
 }
+function Show-DefenderHistory {
+    try {
+        $items = @(Get-CrimsonThreatDetections)
+        if ($items.Count -eq 0) {
+            $message = "No detections are recorded in Microsoft Defender history. This is not a guarantee that every file is clean."
+        } else {
+            $message = ($items | Select-Object -First 30 | ForEach-Object {
+                "{0}  |  {1}  |  {2}" -f $_.ThreatName,$_.InitialDetectionTime,$_.ActionSuccess
+            }) -join $NL
+        }
+        [Windows.Forms.MessageBox]::Show($message,"Microsoft Defender threat history") | Out-Null
+    } catch {
+        [Windows.Forms.MessageBox]::Show($_.Exception.Message,"Threat history unavailable") | Out-Null
+    }
+}
 function Open-DisplaySettings {
     try { Open-CrimsonDisplaySettings; Add-Log "Opened Windows display settings." }
     catch { Add-Log ("Could not open display settings: "+$_.Exception.Message) }
@@ -226,12 +241,13 @@ $resources=New-Button "Resource use" 170 518 142 32
 $defender=New-Button "Defender full scan" 322 518 142 32 $true
 $display=New-Button "Display settings" 474 518 142 32
 $power=New-Button "Power settings" 18 558 142 28
+$history=New-Button "Threat history" 170 558 142 28
 $foot=New-Object Windows.Forms.Label; $foot.Text="No false virus labels  •  No forced awake cores  •  No thermal bypass"
-$foot.Location=New-Object Drawing.Point(170,563); $foot.AutoSize=$true; $foot.ForeColor=$C.Muted
+$foot.Location=New-Object Drawing.Point(322,563); $foot.AutoSize=$true; $foot.ForeColor=$C.Muted
 $foot.Font=New-Object Drawing.Font("Segoe UI",8)
-$right.Controls.AddRange(@($software,$resources,$defender,$display,$power,$foot))
+$right.Controls.AddRange(@($software,$resources,$defender,$display,$power,$history,$foot))
 $software.Add_Click({Show-InstalledSoftware}); $resources.Add_Click({Show-ResourceUse})
-$defender.Add_Click({Invoke-DefenderFullScan}); $display.Add_Click({Open-DisplaySettings}); $power.Add_Click({Open-PowerSettings})
+$defender.Add_Click({Invoke-DefenderFullScan}); $display.Add_Click({Open-DisplaySettings}); $power.Add_Click({Open-PowerSettings}); $history.Add_Click({Show-DefenderHistory})
 
 $refresh.Add_Click({Refresh-Apps}); $apply.Add_Click({Apply-Profile}); $restore.Add_Click({Restore-Profile})
 $preview.Add_Click({Preview-Cleanup}); $clean.Add_Click({Clean-Temp}); $scan.Add_Click({try{Read-System}catch{Add-Log ("System scan failed: "+$_.Exception.Message)}})
