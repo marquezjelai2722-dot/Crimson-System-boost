@@ -72,15 +72,7 @@ jobs:
       - name: Package Windows GUI executable
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
-          Invoke-PS2EXE -inputFile "windows/Crimson-Windows-GUI.ps1" -outputFile "dist/Crimson-System-Boost-Windows.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
-          if (-not (Test-Path "dist/Crimson-System-Boost-Windows.exe")) { throw "EXE packaging did not produce an output file." }
-          $exe = Get-Item "dist/Crimson-System-Boost-Windows.exe"
-          if ($exe.Length -le 0) { throw "EXE output is empty." }
-          $stream = [System.IO.File]::OpenRead($exe.FullName)
-          try { $mz = New-Object byte[] 2; [void]$stream.Read($mz, 0, 2) } finally { $stream.Dispose() }
-          if ([System.Text.Encoding]::ASCII.GetString($mz) -ne "MZ") { throw "EXE does not have a valid Windows PE signature." }
-          Write-Host ("Packaged EXE: {0:N0} bytes" -f $exe.Length)
+          & "windows/Build-Windows.ps1"
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v7
         with:
