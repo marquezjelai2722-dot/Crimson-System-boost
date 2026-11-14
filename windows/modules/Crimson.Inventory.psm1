@@ -12,7 +12,8 @@ function Get-CrimsonInstalledSoftware {
         try {
             Get-ItemProperty -Path $root -ErrorAction Stop | ForEach-Object {
                 if (-not [string]::IsNullOrWhiteSpace([string]$_.DisplayName)) {
-                    $size = if ($_.EstimatedSize) { [long]$_.EstimatedSize * 1KB } else { $null }
+                    $sizeProperty = $_.PSObject.Properties['EstimatedSize']
+                    $size = if ($sizeProperty -and $sizeProperty.Value) { [long]$sizeProperty.Value * 1KB } else { $null }
                     [pscustomobject]@{
                         Name = [string]$_.DisplayName
                         Version = [string]$_.DisplayVersion
