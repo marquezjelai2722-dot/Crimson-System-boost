@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.StatFs
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -26,6 +27,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -38,6 +40,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
+import com.crimson.boost.core.inventory.InstalledAppInventory
+import com.crimson.boost.core.inventory.InventoryRefreshScheduler
 
 class MainActivity : Activity() {
     private val bg = Color.rgb(10, 8, 14)
@@ -116,7 +120,8 @@ class MainActivity : Activity() {
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = false
         Shizuku.addRequestPermissionResultListener(permissionListener)
-        render()
+        runCatching { InventoryRefreshScheduler.schedule(this) }
+        showStartupSequence()
     }
 
     override fun onResume() {
@@ -215,6 +220,7 @@ class MainActivity : Activity() {
             setLineSpacing(dp(3).toFloat(), 1f)
         }
         statusCard.addView(monitorText)
+        statusCard.addView(secondaryAction("Open display refresh-rate settings") { openDisplaySettings() })
         content.addView(statusCard)
         content.addView(space(12))
 
@@ -291,6 +297,7 @@ class MainActivity : Activity() {
         val appCard = cardContainer()
         appCard.addView(label("LOCAL APP LAUNCHER", 14, textMain, true))
         appCard.addView(label("Browse launchable apps and games without sending the inventory to a server.", 13, textMuted))
+        appCard.addView(secondaryAction("Inspect installed app inventory") { inspectInstalledApps() })
         appCard.addView(secondaryAction("Browse installed launchable apps") { chooseGame { pkg, title ->
             val launch = packageManager.getLaunchIntentForPackage(pkg)
             if (launch != null) safeOpen(launch) else toast("$title has no launcher activity.")
@@ -364,6 +371,114 @@ class MainActivity : Activity() {
         setContentView(root)
         if (!getPreferences(MODE_PRIVATE).getBoolean("mascot_tutorial_seen", false)) {
             handler.postDelayed({ if (!isFinishing) showMascotTutorial() }, 700)
+        }
+    }
+
+
+    private fun showStartupSequence() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(28), dp(32), dp(28), dp(32))
+            setBackgroundColor(bg)
+        }
+        val mascot = CrimsonMascotView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(132), dp(176))
+            setFolderPose(true)
+            contentDescription = "Crimson mascot inspecting a system folder"
+            isClickable = false
+        }
+        root.addView(mascot)
+        root.addView(space(18))
+        root.addView(label("CRIMSON SYSTEM BOOST", 22, textMain, true))
+        root.addView(label("INSPECTING • INITIALIZING SAFE MODULES", 10, accentCool, true))
+        root.addView(space(12))
+        val status = label("Checking device capabilities…", 13, textMuted)
+        root.addView(status)
+        root.addView(space(12))
+        val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 4
+            progress = 0
+            progressTintList = android.content.res.ColorStateList.valueOf(accent)
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(surfaceAlt)
+            layoutParams = LinearLayout.LayoutParams(-1, dp(5))
+        }
+        root.addView(progress)
+        root.addView(space(14))
+        root.addView(label("Local inventory • Reversible controls • No fake security verdicts", 11, textMuted))
+        setContentView(root)
+
+        val steps = listOf(
+            "Checking device capabilities…",
+            "Loading isolated inventory modules…",
+            "Preparing safe maintenance controls…",
+            "Opening the performance dashboard…"
+        )
+        var index = 0
+        val startup = object : Runnable {
+            override fun run() {
+                if (isFinishing || isDestroyed) return
+                if (index < steps.size) {
+                    status.text = steps[index]
+                    progress.progress = index + 1
+                    index++
+                    handler.postDelayed(this, 360)
+                } else {
+                    render()
+                }
+            }
+        }
+        handler.post(startup)
+    }
+
+    private fun inspectInstalledApps() {
+        toast("Inspecting installed app metadata…")
+        executor.execute {
+            val report = runCatching { InstalledAppInventory(packageManager).scan() }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val body = report.fold(
+                    onSuccess = { result ->
+                        buildString {
+                            append("INSTALLED APPS: ${result.apps.size}\n")
+                            append("SYSTEM: ${result.systemApps}  •  USER: ${result.userApps}\n")
+                            append("LARGE APK FILES: ${result.largeApks}\n")
+                            append("SKIPPED: ${result.skippedPackages}\n\n")
+                            append("SECURITY STATUS: NOT SCANNED\n")
+                            append("This is an inventory, not an antivirus verdict. Android Play Protect handles malware protection.\n\n")
+                            result.apps.take(80).forEach { app ->
+                                val size = app.apkSizeBytes?.let { String.format("%.1f MB", it / 1048576.0) } ?: "size unavailable"
+                                append("• ${app.displayName}\n")
+                                append("  ${app.origin}  |  $size  |  NOT SCANNED\n")
+                                append("  ${app.packageName}\n\n")
+                            }
+                            if (result.apps.size > 80) append("Showing first 80 entries. Total: ${result.apps.size}.")
+                        }
+                    },
+                    onFailure = { "Inventory scan failed: ${it.message ?: "unknown error"}" }
+                )
+                val textView = label(body, 12, textMain).apply {
+                    typeface = Typeface.MONOSPACE
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
+                }
+                val scroll = ScrollView(this).apply {
+                    addView(textView)
+                    isFillViewport = true
+                }
+                AlertDialog.Builder(this)
+                    .setTitle("Installed app inventory")
+                    .setView(scroll)
+                    .setPositiveButton("Close", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun openDisplaySettings() {
+        try {
+            safeOpen(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+        } catch (_: Exception) {
+            safeOpen(Intent(Settings.ACTION_SETTINGS))
         }
     }
 
