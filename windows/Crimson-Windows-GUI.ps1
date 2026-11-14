@@ -9,6 +9,10 @@ Add-Type -AssemblyName System.Drawing
 $StateDir = Join-Path $env:LOCALAPPDATA "CrimsonSystemBoost"
 $StateFile = Join-Path $StateDir "process-priority-backup.json"
 $NL = [Environment]::NewLine
+$InventoryModule = Join-Path $PSScriptRoot "modules\Crimson.Inventory.psm1"
+if (Test-Path -LiteralPath $InventoryModule) {
+    Import-Module $InventoryModule -Force -ErrorAction Stop
+}
 $C = @{
     Bg=[Drawing.Color]::FromArgb(17,19,24); Panel=[Drawing.Color]::FromArgb(27,31,39)
     Panel2=[Drawing.Color]::FromArgb(39,45,56); Border=[Drawing.Color]::FromArgb(69,76,89)
@@ -27,6 +31,40 @@ function New-Button([string]$Text,[int]$X,[int]$Y,[int]$W,[int]$H=38,[bool]$Prim
 function Add-Log([string]$Message) {
     $script:Log.AppendText(("["+(Get-Date -Format "HH:mm:ss")+"] "+$Message+$NL))
     $script:Log.SelectionStart=$script:Log.TextLength; $script:Log.ScrollToCaret()
+}
+function Show-InstalledSoftware {
+    try {
+        $items = @(Get-CrimsonInstalledSoftware)
+        Add-Log ("Installed software inventory: " + $items.Count + " entries.")
+        foreach ($item in ($items | Select-Object -First 24)) {
+            Add-Log ("  " + $item.Name + $(if ($item.Version) { "  v" + $item.Version } else { "" }))
+        }
+        if ($items.Count -gt 24) { Add-Log ("  plus " + ($items.Count - 24) + " more.") }
+    } catch { Add-Log ("Inventory failed: " + $_.Exception.Message) }
+}
+function Show-DefenderStatus {
+    try {
+        $state = Get-CrimsonDefenderStatus
+        Add-Log ("SECURITY: " + $state.Status)
+        if ($state.Available) {
+            Add-Log ("Real-time protection: " + $state.RealTimeProtectionEnabled)
+            Add-Log ("Antivirus enabled: " + $state.AntivirusEnabled)
+            Add-Log ("Signature age (days): " + $state.AntivirusSignatureAge)
+        }
+    } catch { Add-Log ("Defender status failed: " + $_.Exception.Message) }
+}
+function Request-DefenderQuickScan {
+    $answer = [Windows.Forms.MessageBox]::Show(
+        "Request Microsoft Defender to run a quick scan? Crimson will not replace or disable your installed antivirus.",
+        "Confirm security scan",
+        [Windows.Forms.MessageBoxButtons]::YesNo,
+        [Windows.Forms.MessageBoxIcon]::Information
+    )
+    if ($answer -ne [Windows.Forms.DialogResult]::Yes) { Add-Log "Security scan cancelled."; return }
+    try {
+        $result = Start-CrimsonDefenderQuickScan -Confirm:$false
+        Add-Log ([string]$result)
+    } catch { Add-Log ("Defender scan request failed: " + $_.Exception.Message) }
 }
 function Refresh-Apps {
     $script:Apps.Items.Clear(); $script:AppIds=@{}
@@ -153,9 +191,15 @@ $scan=New-Button "Refresh system information" 418 10 200; $right.Controls.Add($s
 $script:Info=New-Object Windows.Forms.RichTextBox; $script:Info.Location=New-Object Drawing.Point(18,48); $script:Info.Size=New-Object Drawing.Size(600,205)
 $script:Info.Anchor="Top,Left,Right"; $script:Info.ReadOnly=$true; $script:Info.BorderStyle="None"; $script:Info.BackColor=$C.Panel2
 $script:Info.ForeColor=$C.Text; $script:Info.Font=New-Object Drawing.Font("Consolas",9); $right.Controls.Add($script:Info)
-$logTitle=New-Object Windows.Forms.Label; $logTitle.Text="ACTIVITY LOG"; $logTitle.Location=New-Object Drawing.Point(18,272)
+$securityTitle=New-Object Windows.Forms.Label; $securityTitle.Text="APP INVENTORY  /  NATIVE SECURITY"; $securityTitle.Location=New-Object Drawing.Point(18,268)
+$securityTitle.AutoSize=$true; $securityTitle.ForeColor=$C.Muted; $securityTitle.Font=New-Object Drawing.Font("Segoe UI",10,[Drawing.FontStyle]::Bold); $right.Controls.Add($securityTitle)
+$inventoryButton=New-Button "Installed software" 18 296 180
+$defenderButton=New-Button "Protection status" 210 296 180
+$securityScanButton=New-Button "Request quick scan" 402 296 180 38 $true
+$right.Controls.AddRange(@($inventoryButton,$defenderButton,$securityScanButton))
+$logTitle=New-Object Windows.Forms.Label; $logTitle.Text="ACTIVITY LOG"; $logTitle.Location=New-Object Drawing.Point(18,346)
 $logTitle.AutoSize=$true; $logTitle.ForeColor=$C.Muted; $logTitle.Font=New-Object Drawing.Font("Segoe UI",10,[Drawing.FontStyle]::Bold); $right.Controls.Add($logTitle)
-$script:Log=New-Object Windows.Forms.RichTextBox; $script:Log.Location=New-Object Drawing.Point(18,302); $script:Log.Size=New-Object Drawing.Size(600,202)
+$script:Log=New-Object Windows.Forms.RichTextBox; $script:Log.Location=New-Object Drawing.Point(18,374); $script:Log.Size=New-Object Drawing.Size(600,132)
 $script:Log.Anchor="Top,Bottom,Left,Right"; $script:Log.ReadOnly=$true; $script:Log.BorderStyle="None"; $script:Log.BackColor=$C.Panel2
 $script:Log.ForeColor=$C.Text; $script:Log.Font=New-Object Drawing.Font("Consolas",8.5); $right.Controls.Add($script:Log)
 $foot=New-Object Windows.Forms.Label; $foot.Text="No FPS guarantee  •  No anti-cheat bypass  •  No security or thermal disabling"
@@ -163,6 +207,7 @@ $foot.Location=New-Object Drawing.Point(18,518); $foot.AutoSize=$true; $foot.For
 $foot.Font=New-Object Drawing.Font("Segoe UI",8); $right.Controls.Add($foot)
 
 $refresh.Add_Click({Refresh-Apps}); $apply.Add_Click({Apply-Profile}); $restore.Add_Click({Restore-Profile})
+$inventoryButton.Add_Click({Show-InstalledSoftware}); $defenderButton.Add_Click({Show-DefenderStatus}); $securityScanButton.Add_Click({Request-DefenderQuickScan})
 $preview.Add_Click({Preview-Cleanup}); $clean.Add_Click({Clean-Temp}); $scan.Add_Click({try{Read-System}catch{Add-Log ("System scan failed: "+$_.Exception.Message)}})
 $form.Add_Shown({Refresh-Apps; $scan.PerformClick(); Add-Log "Ready. Select a visible game process to apply a reversible priority request."})
 [void]$form.ShowDialog()
