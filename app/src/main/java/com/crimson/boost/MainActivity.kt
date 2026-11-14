@@ -39,6 +39,12 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import com.crimson.boost.core.inventory.InstalledAppScanner
+import com.crimson.boost.core.scheduling.AppInventoryRefreshWorker
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 class MainActivity : Activity() {
     private val bg = Color.rgb(10, 8, 14)
@@ -117,6 +123,7 @@ class MainActivity : Activity() {
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = false
         Shizuku.addRequestPermissionResultListener(permissionListener)
+        scheduleInventoryRefresh()
         showLoadingScreen()
         handler.postDelayed({ if (!isFinishing) render() }, 1100)
     }
@@ -396,6 +403,20 @@ class MainActivity : Activity() {
         if (!getPreferences(MODE_PRIVATE).getBoolean("mascot_tutorial_seen", false)) {
             handler.postDelayed({ if (!isFinishing) showMascotTutorial() }, 700)
         }
+    }
+
+    private fun scheduleInventoryRefresh() {
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+        val request = PeriodicWorkRequestBuilder<AppInventoryRefreshWorker>(12, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "crimson-app-inventory",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 
     private fun showLoadingScreen() {
