@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: ["main"]
   push:
-    branches: ["feature/security-cross-platform-fps"]
+    branches: ["feature/security-cross-platform-fps", "rebuild/**"]
   workflow_dispatch:
 
 permissions:
@@ -58,7 +58,7 @@ jobs:
       - name: Parse PowerShell sources
         shell: pwsh
         run: |
-          $files = @("windows/Crimson-Windows.ps1", "windows/Crimson-Windows-GUI.ps1")
+          $files = @("windows/Crimson-Windows.ps1", "windows/Crimson-Windows-GUI.ps1", "windows/Build-Windows.ps1", "windows/modules/Crimson.Inventory.psm1", "windows/modules/Crimson.Security.psm1", "windows/modules/Crimson.Maintenance.psm1", "windows/modules/Crimson.Performance.psm1")
           foreach ($file in $files) {
             $tokens = $null
             $errors = $null
