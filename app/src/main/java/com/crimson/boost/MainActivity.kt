@@ -445,7 +445,7 @@ class MainActivity : Activity() {
                             append("LARGE APK FILES: ${result.largeApks}\n")
                             append("SKIPPED: ${result.skippedPackages}\n\n")
                             append("SECURITY STATUS: NOT SCANNED\n")
-                            append("This is an inventory, not an antivirus verdict. Android Play Protect handles malware protection.\n\n")
+                            append("Inventory only — not an antivirus verdict. Use Google Play Protect for malware scanning.\n\n")
                             result.apps.take(80).forEach { app ->
                                 val size = app.apkSizeBytes?.let { String.format("%.1f MB", it / 1048576.0) } ?: "size unavailable"
                                 append("• ${app.displayName}\n")
@@ -485,7 +485,7 @@ class MainActivity : Activity() {
     private fun showMascotTutorial() {
         AlertDialog.Builder(this)
             .setTitle("Meet your Crimson Guardian")
-            .setMessage("DRAG  — Move the guardian anywhere inside the app.\n\nRELEASE  — It settles with a restrained landing motion.\n\nTAP  — Reopen this guide.\n\nHOLD  — Preview the inspection-folder pose.\n\nThe guardian uses a compact chibi silhouette with a serious masked design. File scanning is not connected in this build.")
+            .setMessage("DRAG  — Move the guardian anywhere inside the app.\n\nRELEASE  — It settles with a restrained landing motion.\n\nTAP  — Reopen this guide.\n\nHOLD  — Preview the inspection-folder pose.\n\nThe guardian uses a compact masked design. Crimson inventories app metadata; malware protection is handled by Google Play Protect, not by a built-in antivirus engine.")
             .setPositiveButton("Got it") { _, _ ->
                 getPreferences(MODE_PRIVATE).edit().putBoolean("mascot_tutorial_seen", true).apply()
             }
