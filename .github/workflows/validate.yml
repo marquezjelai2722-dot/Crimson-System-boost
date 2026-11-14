@@ -66,6 +66,20 @@ jobs:
             if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error "$($file): $($_.Message)" }; exit 1 }
             Write-Host "$file syntax is valid."
           }
+      - name: Smoke-test isolated Windows modules
+        shell: pwsh
+        run: |
+          Import-Module ./windows/modules/Crimson.Inventory.psm1 -Force
+          Import-Module ./windows/modules/Crimson.Security.psm1 -Force
+          Import-Module ./windows/modules/Crimson.Maintenance.psm1 -Force
+          Import-Module ./windows/modules/Crimson.Performance.psm1 -Force
+          $required = @("Get-CrimsonInstalledSoftware","Get-CrimsonResourceHeavyProcesses","Get-CrimsonDefenderStatus","Get-CrimsonThreatDetections","Start-CrimsonDefenderFullScan","Get-CrimsonTemporaryFiles","Remove-CrimsonTemporaryFiles","Open-CrimsonDisplaySettings","Get-CrimsonProcessorTopology","Get-CrimsonPowerPlan","Open-CrimsonPowerSettings")
+          foreach ($name in $required) { if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw "Missing module function: $name" } }
+          $null = Get-CrimsonDefenderStatus
+          $null = Get-CrimsonInstalledSoftware
+          $null = Get-CrimsonResourceHeavyProcesses -Top 1
+          $null = Get-CrimsonTemporaryFiles -OlderThanDays 7
+          Write-Host "Isolated module smoke tests passed."
       - name: Install PS2EXE
         shell: pwsh
         run: Install-Module ps2exe -Scope CurrentUser -Force -AllowClobber
