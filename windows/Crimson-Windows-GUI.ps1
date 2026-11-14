@@ -56,6 +56,7 @@ function Read-System {
     $ramText=if($ram){"{0:N1} GB" -f ($ram/1GB)}else{"Unavailable"}
     $hz=if($gpu -and $gpu.CurrentRefreshRate -gt 0){"$($gpu.CurrentRefreshRate) Hz"}else{"Unavailable"}
     $drive=if($vol){"{0:N1} GB free / {1:N1} GB" -f ($vol.SizeRemaining/1GB),($vol.Size/1GB)}else{"Unavailable"}
+    $defender=Get-CrimsonDefenderStatus
     $script:Info.Text=@(
         "OPERATING SYSTEM  $($os.Caption) ($($os.OSArchitecture))","",
         "PROCESSOR         $($cpu.Name)",
@@ -63,7 +64,8 @@ function Read-System {
         "INSTALLED RAM     $ramText",
         "GRAPHICS          $($gpu.Name)",
         "DISPLAY REPORT    $hz",
-        "SYSTEM DRIVE      $drive","",
+        "SYSTEM DRIVE      $drive",
+        "SECURITY STATUS   $($defender.Status)","",
         "Display refresh rate is not the same as game FPS."
     ) -join $NL
     Add-Log "System information refreshed."
