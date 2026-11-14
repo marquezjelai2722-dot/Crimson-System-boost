@@ -192,7 +192,7 @@ class MainActivity : Activity() {
         brandText.addView(label("SYSTEM BOOST  /  DEVICE CONTROL", 10, textMuted, true))
         header.addView(brandText)
         header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        header.addView(label("0.3.0", 11, textMuted, true))
+        header.addView(label("0.4.1", 11, textMuted, true))
         content.addView(header)
         content.addView(space(18))
 
