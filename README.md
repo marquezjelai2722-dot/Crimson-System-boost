@@ -2,9 +2,11 @@
 
 Crimson System Boost is a safety-first performance toolkit for Android phones/tablets and Windows PCs/laptops. It combines local diagnostics, reversible gaming profiles, safe cleanup, security checks, and optional assistant support.
 
-## Current Android app (v0.3.0 baseline)
+## Current Android app (v0.4.0 rebuild branch)
 - Live RAM, storage, battery, charging state, battery temperature, display refresh rate, device model and Android version.
 - Local launcher for installed apps and games.
+- Searchable-in-progress app inventory foundation: public package metadata, signer SHA-256 fingerprints, preinstalled review candidates, and OS-scheduled 12-hour local refresh through WorkManager.
+- Mascot-led startup inspection screen and direct shortcuts to Android display and developer settings.
 - Optional HTTPS assistant backend; provider API keys remain server-side.
 - Optional Shizuku operations with explicit permission and confirmation:
   - Android GameManager performance/standard mode requests for a selected game.
@@ -13,7 +15,7 @@ Crimson System Boost is a safety-first performance toolkit for Android phones/ta
 
 ## Cross-platform direction
 - **Android:** native app with hardware/display diagnostics and supported GameManager requests.
-- **Windows PCs and laptops:** PowerShell companion for hardware/display diagnostics, reversible game-process priority profiles, restore, and safe temporary-file cleanup.
+- **Windows PCs and laptops:** PowerShell companion for hardware/display diagnostics, reversible game-process priority profiles, restore, safe temporary-file cleanup, installed-software inventory, and Microsoft Defender status/quick-scan hand-off.
 - **Shared FPS dashboard direction:** distinguish display refresh rate (Hz), game FPS, and frame pacing. Supported settings only; no universal cap bypass is possible.
 
 ### Windows companion
@@ -31,7 +33,7 @@ Boost requests AboveNormal priority for a selected visible process and saves its
 Crimson aims for the highest stable FPS supported by hardware, display, OS, and game. It cannot guarantee an FPS increase or universally remove a game's internal frame cap. It does not patch game files, bypass anti-cheat, disable thermal protections, overclock hardware, use Realtime process priority, or run arbitrary shell commands. See [FPS controls](docs/FPS-CONTROL-AND-UNCAPPING.md).
 
 ## Security
-See [SECURITY.md](SECURITY.md). CodeQL and dependency review workflows run on repository changes. Never commit API keys, signing keys, tokens, or production .env files. Revoke credentials previously exposed in chat or source control.
+The inventory is metadata-only and is not an antivirus engine. Android cannot inspect other apps' private data; Windows delegates malware scanning to Microsoft Defender when available. Preinstalled or large does not mean malicious. Background Android inventory refresh is OS-scheduled and is not continuous runtime malware scanning. See [SECURITY.md](SECURITY.md) and [rebuild architecture](docs/REBUILD-ARCHITECTURE.md). CodeQL and dependency review workflows run on repository changes. Never commit API keys, signing keys, tokens, or production .env files. Revoke credentials previously exposed in chat or source control.
 
 ## Build Android APK
 Push to main or open Actions → Build Android APK → Run workflow. GitHub Actions builds a debug APK and uploads a temporary workflow artifact. The APK is debug-signed for direct testing/sideloading, not Play Store production.
