@@ -61,13 +61,8 @@ jobs:
       - name: Build Windows EXE
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
-          Invoke-PS2EXE -inputFile "windows/Crimson-Windows-GUI.ps1" -outputFile "dist/Crimson-System-Boost-Windows-v0.4.1.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
-          $exe = Get-Item "dist/Crimson-System-Boost-Windows-v0.4.1.exe"
-          if ($exe.Length -le 0) { throw "EXE output is empty." }
-          $stream = [System.IO.File]::OpenRead($exe.FullName)
-          try { $mz = New-Object byte[] 2; [void]$stream.Read($mz, 0, 2) } finally { $stream.Dispose() }
-          if ([System.Text.Encoding]::ASCII.GetString($mz) -ne "MZ") { throw "EXE does not have a valid Windows PE signature." }
+          & "windows/Build-Windows.ps1"
+          Move-Item "dist/Crimson-System-Boost-Windows.exe" "dist/Crimson-System-Boost-Windows-v0.4.1.exe" -Force
       - name: Publish Windows-only release
         env:
           GH_TOKEN: ${{ github.token }}
