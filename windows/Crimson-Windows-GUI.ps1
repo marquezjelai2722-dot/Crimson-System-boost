@@ -32,6 +32,14 @@ function Add-Log([string]$Message) {
     $script:Log.AppendText(("["+(Get-Date -Format "HH:mm:ss")+"] "+$Message+$NL))
     $script:Log.SelectionStart=$script:Log.TextLength; $script:Log.ScrollToCaret()
 }
+function Open-DisplaySettings {
+    try { Start-Process "ms-settings:display" -ErrorAction Stop; Add-Log "Opened Windows Display settings." }
+    catch { Add-Log ("Could not open Display settings: " + $_.Exception.Message) }
+}
+function Open-PowerSettings {
+    try { Start-Process "ms-settings:powersleep" -ErrorAction Stop; Add-Log "Opened Windows Power settings. CPU core parking remains OS-managed." }
+    catch { Add-Log ("Could not open Power settings: " + $_.Exception.Message) }
+}
 function Show-InstalledSoftware {
     try {
         $items = @(Get-CrimsonInstalledSoftware)
@@ -197,9 +205,12 @@ $inventoryButton=New-Button "Installed software" 18 296 180
 $defenderButton=New-Button "Protection status" 210 296 180
 $securityScanButton=New-Button "Request quick scan" 402 296 180 38 $true
 $right.Controls.AddRange(@($inventoryButton,$defenderButton,$securityScanButton))
-$logTitle=New-Object Windows.Forms.Label; $logTitle.Text="ACTIVITY LOG"; $logTitle.Location=New-Object Drawing.Point(18,346)
-$logTitle.AutoSize=$true; $logTitle.ForeColor=$C.Muted; $logTitle.Font=New-Object Drawing.Font("Segoe UI",10,[Drawing.FontStyle]::Bold); $right.Controls.Add($logTitle)
-$script:Log=New-Object Windows.Forms.RichTextBox; $script:Log.Location=New-Object Drawing.Point(18,374); $script:Log.Size=New-Object Drawing.Size(600,132)
+$displayButton=New-Button "Display settings" 18 344 180
+$powerButton=New-Button "Power settings" 210 344 180
+$right.Controls.AddRange(@($displayButton,$powerButton))
+$logTitle=New-Object Windows.Forms.Label; $logTitle.Text="ACTIVITY LOG  •  CORE PARKING IS OS-MANAGED"; $logTitle.Location=New-Object Drawing.Point(18,390)
+$logTitle.AutoSize=$true; $logTitle.ForeColor=$C.Muted; $logTitle.Font=New-Object Drawing.Font("Segoe UI",9,[Drawing.FontStyle]::Bold); $right.Controls.Add($logTitle)
+$script:Log=New-Object Windows.Forms.RichTextBox; $script:Log.Location=New-Object Drawing.Point(18,418); $script:Log.Size=New-Object Drawing.Size(600,88)
 $script:Log.Anchor="Top,Bottom,Left,Right"; $script:Log.ReadOnly=$true; $script:Log.BorderStyle="None"; $script:Log.BackColor=$C.Panel2
 $script:Log.ForeColor=$C.Text; $script:Log.Font=New-Object Drawing.Font("Consolas",8.5); $right.Controls.Add($script:Log)
 $foot=New-Object Windows.Forms.Label; $foot.Text="No FPS guarantee  •  No anti-cheat bypass  •  No security or thermal disabling"
@@ -208,6 +219,7 @@ $foot.Font=New-Object Drawing.Font("Segoe UI",8); $right.Controls.Add($foot)
 
 $refresh.Add_Click({Refresh-Apps}); $apply.Add_Click({Apply-Profile}); $restore.Add_Click({Restore-Profile})
 $inventoryButton.Add_Click({Show-InstalledSoftware}); $defenderButton.Add_Click({Show-DefenderStatus}); $securityScanButton.Add_Click({Request-DefenderQuickScan})
+$displayButton.Add_Click({Open-DisplaySettings}); $powerButton.Add_Click({Open-PowerSettings})
 $preview.Add_Click({Preview-Cleanup}); $clean.Add_Click({Clean-Temp}); $scan.Add_Click({try{Read-System}catch{Add-Log ("System scan failed: "+$_.Exception.Message)}})
 $form.Add_Shown({Refresh-Apps; $scan.PerformClick(); Add-Log "Ready. Select a visible game process to apply a reversible priority request."})
 [void]$form.ShowDialog()
