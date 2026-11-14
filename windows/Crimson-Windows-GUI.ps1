@@ -278,8 +278,8 @@ function Show-CrimsonStartupSplash {
             $timer.Stop()
             $splash.Close()
         }
-    })
-    $splash.Add_Shown({ $timer.Start() })
+    }.GetNewClosure())
+    $splash.Add_Shown({ $timer.Start() }.GetNewClosure())
     [void]$splash.ShowDialog()
     $timer.Dispose()
     $splash.Dispose()
