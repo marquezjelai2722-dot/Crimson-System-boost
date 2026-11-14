@@ -73,7 +73,15 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "dist" | Out-Null
-          Invoke-PS2EXE -inputFile "windows/Crimson-Windows-GUI.ps1" -outputFile "dist/Crimson-System-Boost-Windows.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
+          $module = Get-Content "windows/modules/Crimson.Inventory.psm1" -Raw
+          $module = $module -replace '(?m)^Export-ModuleMember.*\r?\n?', ''
+          $gui = Get-Content "windows/Crimson-Windows-GUI.ps1" -Raw
+          Set-Content -LiteralPath "dist/Crimson-Windows-Bundle.ps1" -Value ($module + "`r`n" + $gui) -Encoding UTF8
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD "dist/Crimson-Windows-Bundle.ps1"), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
+          Invoke-PS2EXE -inputFile "dist/Crimson-Windows-Bundle.ps1" -outputFile "dist/Crimson-System-Boost-Windows.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
           if (-not (Test-Path "dist/Crimson-System-Boost-Windows.exe")) { throw "EXE packaging did not produce an output file." }
           $exe = Get-Item "dist/Crimson-System-Boost-Windows.exe"
           if ($exe.Length -le 0) { throw "EXE output is empty." }
