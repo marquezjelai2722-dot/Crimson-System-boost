@@ -301,7 +301,7 @@ $tag.Location=New-Object Drawing.Point(28,49); $tag.AutoSize=$true; $tag.ForeCol
 $tag.Font=New-Object Drawing.Font("Segoe UI",8); $header.Controls.Add($tag)
 $left=New-Object Windows.Forms.Panel; $left.Location=New-Object Drawing.Point(20,102); $left.Size=New-Object Drawing.Size(285,550)
 $left.Anchor="Top,Bottom,Left"; $left.BackColor=$C.Panel; $form.Controls.Add($left)
-$right=New-Object Windows.Forms.Panel; $right.Location=New-Object Drawing.Point(320,102); $right.Size=New-Object Drawing.Size(640,580)
+$right=New-Object Windows.Forms.Panel; $right.Location=New-Object Drawing.Point(320,102); $right.Size=New-Object Drawing.Size(640,558)
 $right.Anchor="Top,Bottom,Left,Right"; $right.BackColor=$C.Panel; $form.Controls.Add($right)
 
 $l1=New-Object Windows.Forms.Label; $l1.Text="GAME PROFILE"; $l1.Location=New-Object Drawing.Point(18,16)
@@ -326,17 +326,17 @@ $script:Info.Anchor="Top,Left,Right"; $script:Info.ReadOnly=$true; $script:Info.
 $script:Info.ForeColor=$C.Text; $script:Info.Font=New-Object Drawing.Font("Consolas",9); $right.Controls.Add($script:Info)
 $logTitle=New-Object Windows.Forms.Label; $logTitle.Text="ACTIVITY LOG"; $logTitle.Location=New-Object Drawing.Point(18,272)
 $logTitle.AutoSize=$true; $logTitle.ForeColor=$C.Muted; $logTitle.Font=New-Object Drawing.Font("Segoe UI",10,[Drawing.FontStyle]::Bold); $right.Controls.Add($logTitle)
-$script:Log=New-Object Windows.Forms.RichTextBox; $script:Log.Location=New-Object Drawing.Point(18,302); $script:Log.Size=New-Object Drawing.Size(600,202)
+$script:Log=New-Object Windows.Forms.RichTextBox; $script:Log.Location=New-Object Drawing.Point(18,302); $script:Log.Size=New-Object Drawing.Size(600,180)
 $script:Log.Anchor="Top,Bottom,Left,Right"; $script:Log.ReadOnly=$true; $script:Log.BorderStyle="None"; $script:Log.BackColor=$C.Panel2
 $script:Log.ForeColor=$C.Text; $script:Log.Font=New-Object Drawing.Font("Consolas",8.5); $right.Controls.Add($script:Log)
-$software=New-Button "Installed software" 18 518 142 32
-$resources=New-Button "Resource use" 170 518 142 32
-$defender=New-Button "Defender full scan" 322 518 142 32 $true
-$display=New-Button "Display settings" 474 518 142 32
-$power=New-Button "Power settings" 18 558 142 28
-$history=New-Button "Threat history" 170 558 142 28
+$software=New-Button "Installed software" 18 492 142 32
+$resources=New-Button "Resource use" 170 492 142 32
+$defender=New-Button "Defender full scan" 322 492 142 32 $true
+$display=New-Button "Display settings" 474 492 142 32
+$power=New-Button "Power settings" 18 530 142 28
+$history=New-Button "Threat history" 170 530 142 28
 $foot=New-Object Windows.Forms.Label; $foot.Text="No false virus labels  •  No forced awake cores  •  No thermal bypass"
-$foot.Location=New-Object Drawing.Point(322,563); $foot.AutoSize=$true; $foot.ForeColor=$C.Muted
+$foot.Location=New-Object Drawing.Point(322,535); $foot.AutoSize=$true; $foot.ForeColor=$C.Muted
 $foot.Font=New-Object Drawing.Font("Segoe UI",8)
 $right.Controls.AddRange(@($software,$resources,$defender,$display,$power,$history,$foot))
 $software.Add_Click({Show-InstalledSoftware}); $resources.Add_Click({Show-ResourceUse})
