@@ -369,6 +369,7 @@ class MainActivity : Activity() {
         }
         root.addView(mascot, mascotParams)
         setContentView(root)
+        if (monitorRunning) handler.post(monitorTick)
         if (!getPreferences(MODE_PRIVATE).getBoolean("mascot_tutorial_seen", false)) {
             handler.postDelayed({ if (!isFinishing) showMascotTutorial() }, 700)
         }
