@@ -3,6 +3,16 @@
 # Normal-user mode. No registry hacks, service disabling, overclocking, or anti-cheat bypass.
 
 $ErrorActionPreference = "Stop"
+
+# Optional source modules. The release builder also embeds their functions into the EXE.
+$moduleRoot = Join-Path $PSScriptRoot "modules"
+if (Test-Path -LiteralPath $moduleRoot) {
+    foreach ($moduleName in @("Crimson.Inventory.psm1","Crimson.Security.psm1","Crimson.Maintenance.psm1","Crimson.Performance.psm1")) {
+        $modulePath = Join-Path $moduleRoot $moduleName
+        if (Test-Path -LiteralPath $modulePath) { Import-Module $modulePath -Force -ErrorAction Stop }
+    }
+}
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
@@ -116,6 +126,57 @@ function Clean-Temp {
     Add-Log "Deleted $removed temporary file(s)."
 }
 
+
+function Show-InstalledSoftware {
+    try {
+        $items = @(Get-CrimsonInstalledSoftware)
+        $large = @($items | Where-Object { $_.LargeFootprint })
+        Add-Log ("Installed software: {0}; large reported footprint (>=1 GB): {1}." -f $items.Count,$large.Count)
+        $lines = $items | Select-Object -First 100 | ForEach-Object {
+            $size = if ($null -ne $_.EstimatedBytes) { "{0:N1} GB" -f ($_.EstimatedBytes/1GB) } else { "size unknown" }
+            $tag = if ($_.LargeFootprint) { "  [LARGE INSTALL]" } else { "" }
+            "{0}  |  {1}  |  {2}{3}" -f $_.Name,$size,$_.Publisher,$tag
+        }
+        [Windows.Forms.MessageBox]::Show(($lines -join $NL),"Installed software inventory") | Out-Null
+    } catch { Add-Log ("Software inventory failed: "+$_.Exception.Message) }
+}
+function Show-ResourceUse {
+    try {
+        $items = @(Get-CrimsonResourceHeavyProcesses -Top 15)
+        $lines = $items | ForEach-Object { "{0}  PID {1}  |  {2} MB RAM  |  CPU time {3}s" -f $_.ProcessName,$_.Id,$_.MemoryMB,$_.CpuSeconds }
+        [Windows.Forms.MessageBox]::Show(($lines -join $NL),"Largest process memory use") | Out-Null
+    } catch { Add-Log ("Resource report failed: "+$_.Exception.Message) }
+}
+function Invoke-DefenderFullScan {
+    try {
+        $status = Get-CrimsonDefenderStatus
+        if (-not $status.Available) {
+            [Windows.Forms.MessageBox]::Show($status.Status,"Security scan unavailable") | Out-Null
+            return
+        }
+        if (-not $status.Enabled) {
+            [Windows.Forms.MessageBox]::Show("Microsoft Defender is not active. Crimson will not claim the system is clean.","Protection unavailable") | Out-Null
+            return
+        }
+        $answer = [Windows.Forms.MessageBox]::Show(
+            "Start a Microsoft Defender full scan? It can take a long time and may affect performance while gaming.",
+            "Confirm full malware scan",
+            [Windows.Forms.MessageBoxButtons]::YesNo,
+            [Windows.Forms.MessageBoxIcon]::Warning)
+        if ($answer -ne [Windows.Forms.DialogResult]::Yes) { Add-Log "Full scan cancelled."; return }
+        Start-CrimsonDefenderFullScan -Confirm:$false
+        Add-Log "Microsoft Defender full scan requested. Check Windows Security for progress and results."
+    } catch { Add-Log ("Defender scan request failed: "+$_.Exception.Message) }
+}
+function Open-DisplaySettings {
+    try { Open-CrimsonDisplaySettings; Add-Log "Opened Windows display settings." }
+    catch { Add-Log ("Could not open display settings: "+$_.Exception.Message) }
+}
+function Open-PowerSettings {
+    try { Open-CrimsonPowerSettings; Add-Log "Opened Windows power settings. Use supported power modes; do not disable core parking or idle states." }
+    catch { Add-Log ("Could not open power settings: "+$_.Exception.Message) }
+}
+
 $form=New-Object Windows.Forms.Form
 $form.Text="Crimson System Boost - Windows"; $form.StartPosition="CenterScreen"
 $form.Size=New-Object Drawing.Size(1000,700); $form.MinimumSize=New-Object Drawing.Size(900,620)
@@ -130,7 +191,7 @@ $tag.Location=New-Object Drawing.Point(28,49); $tag.AutoSize=$true; $tag.ForeCol
 $tag.Font=New-Object Drawing.Font("Segoe UI",8); $header.Controls.Add($tag)
 $left=New-Object Windows.Forms.Panel; $left.Location=New-Object Drawing.Point(20,102); $left.Size=New-Object Drawing.Size(285,550)
 $left.Anchor="Top,Bottom,Left"; $left.BackColor=$C.Panel; $form.Controls.Add($left)
-$right=New-Object Windows.Forms.Panel; $right.Location=New-Object Drawing.Point(320,102); $right.Size=New-Object Drawing.Size(640,550)
+$right=New-Object Windows.Forms.Panel; $right.Location=New-Object Drawing.Point(320,102); $right.Size=New-Object Drawing.Size(640,580)
 $right.Anchor="Top,Bottom,Left,Right"; $right.BackColor=$C.Panel; $form.Controls.Add($right)
 
 $l1=New-Object Windows.Forms.Label; $l1.Text="GAME PROFILE"; $l1.Location=New-Object Drawing.Point(18,16)
@@ -158,9 +219,17 @@ $logTitle.AutoSize=$true; $logTitle.ForeColor=$C.Muted; $logTitle.Font=New-Objec
 $script:Log=New-Object Windows.Forms.RichTextBox; $script:Log.Location=New-Object Drawing.Point(18,302); $script:Log.Size=New-Object Drawing.Size(600,202)
 $script:Log.Anchor="Top,Bottom,Left,Right"; $script:Log.ReadOnly=$true; $script:Log.BorderStyle="None"; $script:Log.BackColor=$C.Panel2
 $script:Log.ForeColor=$C.Text; $script:Log.Font=New-Object Drawing.Font("Consolas",8.5); $right.Controls.Add($script:Log)
-$foot=New-Object Windows.Forms.Label; $foot.Text="No FPS guarantee  •  No anti-cheat bypass  •  No security or thermal disabling"
-$foot.Location=New-Object Drawing.Point(18,518); $foot.AutoSize=$true; $foot.ForeColor=$C.Muted
-$foot.Font=New-Object Drawing.Font("Segoe UI",8); $right.Controls.Add($foot)
+$software=New-Button "Installed software" 18 518 142 32
+$resources=New-Button "Resource use" 170 518 142 32
+$defender=New-Button "Defender full scan" 322 518 142 32 $true
+$display=New-Button "Display settings" 474 518 142 32
+$power=New-Button "Power settings" 18 558 142 28
+$foot=New-Object Windows.Forms.Label; $foot.Text="No false virus labels  •  No forced awake cores  •  No thermal bypass"
+$foot.Location=New-Object Drawing.Point(170,563); $foot.AutoSize=$true; $foot.ForeColor=$C.Muted
+$foot.Font=New-Object Drawing.Font("Segoe UI",8)
+$right.Controls.AddRange(@($software,$resources,$defender,$display,$power,$foot))
+$software.Add_Click({Show-InstalledSoftware}); $resources.Add_Click({Show-ResourceUse})
+$defender.Add_Click({Invoke-DefenderFullScan}); $display.Add_Click({Open-DisplaySettings}); $power.Add_Click({Open-PowerSettings})
 
 $refresh.Add_Click({Refresh-Apps}); $apply.Add_Click({Apply-Profile}); $restore.Add_Click({Restore-Profile})
 $preview.Add_Click({Preview-Cleanup}); $clean.Add_Click({Clean-Temp}); $scan.Add_Click({try{Read-System}catch{Add-Log ("System scan failed: "+$_.Exception.Message)}})
