@@ -9,8 +9,8 @@ Add-Type -AssemblyName System.Drawing
 $StateDir = Join-Path $env:LOCALAPPDATA "CrimsonSystemBoost"
 $StateFile = Join-Path $StateDir "process-priority-backup.json"
 $NL = [Environment]::NewLine
-$InventoryModule = Join-Path $PSScriptRoot "modules\Crimson.Inventory.psm1"
-if (Test-Path -LiteralPath $InventoryModule) {
+$InventoryModule = if ($PSScriptRoot) { Join-Path $PSScriptRoot "modules\Crimson.Inventory.psm1" } else { $null }
+if ($InventoryModule -and (Test-Path -LiteralPath $InventoryModule)) {
     Import-Module $InventoryModule -Force -ErrorAction Stop
 }
 $C = @{
