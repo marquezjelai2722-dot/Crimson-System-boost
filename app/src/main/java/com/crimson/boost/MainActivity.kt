@@ -457,6 +457,8 @@ class MainActivity : Activity() {
         stack.addView(label("INITIALIZING DEVICE INSPECTION", 10, accent, true))
         stack.addView(space(12))
         stack.addView(label("Preparing isolated diagnostics and app inventory…", 13, textMuted))
+        stack.addView(space(8))
+        stack.addView(label("INSPECTION NOTE  •  App inventory reads public metadata; it does not inspect private app files.", 11, accentCool))
         root.addView(stack, FrameLayout.LayoutParams(-1, -1))
         val mascot = CrimsonMascotView(this).apply {
             setFolderPose(true)
