@@ -38,6 +38,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
+import com.crimson.boost.core.inventory.InstalledAppScanner
 
 class MainActivity : Activity() {
     private val bg = Color.rgb(10, 8, 14)
@@ -116,7 +117,8 @@ class MainActivity : Activity() {
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = false
         Shizuku.addRequestPermissionResultListener(permissionListener)
-        render()
+        showLoadingScreen()
+        handler.postDelayed({ if (!isFinishing) render() }, 1100)
     }
 
     override fun onResume() {
@@ -296,6 +298,35 @@ class MainActivity : Activity() {
             if (launch != null) safeOpen(launch) else toast("$title has no launcher activity.")
         } })
         content.addView(appCard)
+        content.addView(space(8))
+
+        val inventoryCard = cardContainer()
+        inventoryCard.addView(label("INSTALLED APP INVENTORY", 14, textMain, true))
+        inventoryCard.addView(label(
+            "Review preinstalled and user-installed app metadata. This is not an antivirus scan and does not inspect other apps' private files.",
+            13, textMuted
+        ))
+        val inventoryResult = label("Inventory has not been scanned yet.", 12, textMuted)
+        inventoryCard.addView(inventoryResult)
+        inventoryCard.addView(secondaryAction("Scan installed app metadata") {
+            inventoryResult.text = "Scanning installed package metadata…"
+            executor.execute {
+                val report = InstalledAppScanner(this).scan()
+                handler.post {
+                    inventoryResult.text = "Found ${report.apps.size} packages • ${report.preinstalledReviewCount} preinstalled review candidates • ${report.disabledCount} disabled"
+                    val preview = report.apps.take(18).joinToString("\n") {
+                        "${it.displayName} — ${it.classification.name.replace('_', ' ')}"
+                    }
+                    val warnings = if (report.warnings.isEmpty()) "" else "\n\nWarnings: ${report.warnings.joinToString("; ")}"
+                    AlertDialog.Builder(this)
+                        .setTitle("Installed app inventory")
+                        .setMessage("${preview.ifBlank { "No package metadata was available." }}${warnings}\n\nPreinstalled does not mean malicious. Use your device's security protection for malware verdicts.")
+                        .setPositiveButton("Close", null)
+                        .show()
+                }
+            }
+        })
+        content.addView(inventoryCard)
         content.addView(space(16))
 
         content.addView(sectionTitle("CRIMSON ASSISTANT"))
@@ -365,6 +396,35 @@ class MainActivity : Activity() {
         if (!getPreferences(MODE_PRIVATE).getBoolean("mascot_tutorial_seen", false)) {
             handler.postDelayed({ if (!isFinishing) showMascotTutorial() }, 700)
         }
+    }
+
+    private fun showLoadingScreen() {
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(bg)
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+        }
+        val stack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+        }
+        stack.addView(ImageView(this).apply {
+            setImageResource(R.drawable.crimson_mark)
+            layoutParams = LinearLayout.LayoutParams(dp(64), dp(64))
+        })
+        stack.addView(space(16))
+        stack.addView(label("CRIMSON SYSTEM BOOST", 21, textMain, true))
+        stack.addView(label("INITIALIZING DEVICE INSPECTION", 10, accent, true))
+        stack.addView(space(12))
+        stack.addView(label("Preparing isolated diagnostics and app inventory…", 13, textMuted))
+        root.addView(stack, FrameLayout.LayoutParams(-1, -1))
+        val mascot = CrimsonMascotView(this).apply {
+            setFolderPose(true)
+            contentDescription = "Crimson mascot holding an inspection folder"
+        }
+        root.addView(mascot, FrameLayout.LayoutParams(dp(112), dp(154), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = dp(18)
+        })
+        setContentView(root)
     }
 
     private fun showMascotTutorial() {
