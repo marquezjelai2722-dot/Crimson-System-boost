@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.StatFs
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -262,6 +263,25 @@ class MainActivity : Activity() {
             ) { runAdvanced("Standard game mode: $title") { it.setGameMode(pkg, "standard") } }
         } })
         content.addView(gameCard)
+        content.addView(space(8))
+
+        val displayCard = cardContainer()
+        displayCard.addView(label("DISPLAY AND DEVELOPER SETTINGS", 14, textMain, true))
+        displayCard.addView(label(
+            "Crimson can report supported refresh modes and open Android's own settings. Device-wide Hz and developer settings remain under your control; changing this app's window does not unlock game FPS.",
+            13, textMuted
+        ))
+        displayCard.addView(secondaryAction("Open display settings") {
+            safeOpen(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+        })
+        displayCard.addView(secondaryAction("Open developer options") {
+            try {
+                safeOpen(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+            } catch (_: Exception) {
+                toast("Developer options are unavailable on this device.")
+            }
+        })
+        content.addView(displayCard)
         content.addView(space(8))
 
         val maintenanceCard = cardContainer()
