@@ -14,10 +14,10 @@ if ($InventoryModule -and (Test-Path -LiteralPath $InventoryModule)) {
     Import-Module $InventoryModule -Force -ErrorAction Stop
 }
 $C = @{
-    Bg=[Drawing.Color]::FromArgb(17,19,24); Panel=[Drawing.Color]::FromArgb(27,31,39)
-    Panel2=[Drawing.Color]::FromArgb(39,45,56); Border=[Drawing.Color]::FromArgb(69,76,89)
-    Text=[Drawing.Color]::FromArgb(242,244,248); Muted=[Drawing.Color]::FromArgb(160,170,184)
-    Red=[Drawing.Color]::FromArgb(229,72,77); Green=[Drawing.Color]::FromArgb(54,179,126)
+    Bg=[Drawing.Color]::FromArgb(16,13,16); Panel=[Drawing.Color]::FromArgb(28,23,26)
+    Panel2=[Drawing.Color]::FromArgb(42,34,37); Border=[Drawing.Color]::FromArgb(74,59,64)
+    Text=[Drawing.Color]::FromArgb(244,240,241); Muted=[Drawing.Color]::FromArgb(181,166,170)
+    Red=[Drawing.Color]::FromArgb(242,91,104); Green=[Drawing.Color]::FromArgb(99,201,138)
 }
 function New-Button([string]$Text,[int]$X,[int]$Y,[int]$W,[int]$H=38,[bool]$Primary=$false) {
     $b=New-Object Windows.Forms.Button
