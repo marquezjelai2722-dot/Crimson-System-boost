@@ -5,8 +5,9 @@
 $ErrorActionPreference = "Stop"
 
 # Optional source modules. The release builder also embeds their functions into the EXE.
-$moduleRoot = Join-Path $PSScriptRoot "modules"
-if (Test-Path -LiteralPath $moduleRoot) {
+$moduleRoot = ""
+if (-not [string]::IsNullOrWhiteSpace([string]$PSScriptRoot)) { $moduleRoot = Join-Path $PSScriptRoot "modules" }
+if ($moduleRoot -and (Test-Path -LiteralPath $moduleRoot)) {
     foreach ($moduleName in @("Crimson.Inventory.psm1","Crimson.Security.psm1","Crimson.Maintenance.psm1","Crimson.Performance.psm1")) {
         $modulePath = Join-Path $moduleRoot $moduleName
         if (Test-Path -LiteralPath $modulePath) { Import-Module $modulePath -Force -ErrorAction Stop }
@@ -188,6 +189,103 @@ function Open-PowerSettings {
     try { Open-CrimsonPowerSettings; Add-Log "Opened Windows power settings. Use supported power modes; do not disable core parking or idle states." }
     catch { Add-Log ("Could not open power settings: "+$_.Exception.Message) }
 }
+
+
+function Show-CrimsonStartupSplash {
+    $splash = New-Object Windows.Forms.Form
+    $splash.Text = "Crimson System Boost"
+    $splash.StartPosition = "CenterScreen"
+    $splash.FormBorderStyle = "FixedDialog"
+    $splash.ControlBox = $false
+    $splash.ShowInTaskbar = $false
+    $splash.ClientSize = New-Object Drawing.Size(520,250)
+    $splash.BackColor = $C.Bg
+    $splash.ForeColor = $C.Text
+
+    $mascot = New-Object Windows.Forms.Panel
+    $mascot.Location = New-Object Drawing.Point(18,28)
+    $mascot.Size = New-Object Drawing.Size(172,178)
+    $mascot.BackColor = $C.Panel
+    $mascot.Add_Paint({
+        param($sender,$e)
+        $g = $e.Graphics
+        $g.FillRectangle([Drawing.Brushes]::Black, 34, 14, 104, 86)
+        $g.FillRectangle([Drawing.Brushes]::DimGray, 44, 7, 84, 15)
+        $g.FillRectangle([Drawing.Brushes]::DarkSlateGray, 43, 25, 86, 66)
+        $g.FillRectangle([Drawing.Brushes]::Black, 54, 34, 66, 48)
+        $g.FillRectangle([Drawing.Brushes]::DarkGray, 49, 39, 5, 37)
+        $g.FillRectangle([Drawing.Brushes]::DarkGray, 120, 38, 5, 38)
+        $g.FillRectangle([Drawing.Brushes]::DarkOrange, 83, 38, 31, 9)
+        $g.FillRectangle([Drawing.Brushes]::DarkOrange, 70, 47, 44, 9)
+        $g.FillRectangle([Drawing.Brushes]::DarkOrange, 86, 56, 25, 8)
+        $g.FillRectangle([Drawing.Brushes]::Black, 52, 94, 72, 62)
+        $g.FillRectangle([Drawing.Brushes]::DimGray, 44, 105, 86, 43)
+        $g.FillRectangle([Drawing.Brushes]::DarkSlateGray, 36, 113, 103, 18)
+        $g.FillRectangle([Drawing.Brushes]::SaddleBrown, 93, 111, 58, 42)
+        $g.FillRectangle([Drawing.Brushes]::DarkOrange, 101, 104, 29, 11)
+        $g.FillRectangle([Drawing.Brushes]::Orange, 99, 117, 48, 28)
+        $g.FillRectangle([Drawing.Brushes]::Wheat, 106, 124, 34, 3)
+        $g.FillRectangle([Drawing.Brushes]::Black, 58, 151, 25, 13)
+        $g.FillRectangle([Drawing.Brushes]::Black, 96, 151, 25, 13)
+    })
+    $splash.Controls.Add($mascot)
+
+    $brand = New-Object Windows.Forms.Label
+    $brand.Text = "CRIMSON  /  SYSTEM BOOST"
+    $brand.Location = New-Object Drawing.Point(210,42)
+    $brand.AutoSize = $true
+    $brand.Font = New-Object Drawing.Font("Segoe UI",16,[Drawing.FontStyle]::Bold)
+    $brand.ForeColor = $C.Text
+    $splash.Controls.Add($brand)
+
+    $caption = New-Object Windows.Forms.Label
+    $caption.Text = "INSPECTING  •  INITIALIZING SAFE MODULES"
+    $caption.Location = New-Object Drawing.Point(212,78)
+    $caption.AutoSize = $true
+    $caption.Font = New-Object Drawing.Font("Segoe UI",8,[Drawing.FontStyle]::Bold)
+    $caption.ForeColor = $C.Red
+    $splash.Controls.Add($caption)
+
+    $message = New-Object Windows.Forms.Label
+    $message.Text = "Loading isolated system modules..."
+    $message.Location = New-Object Drawing.Point(212,118)
+    $message.Size = New-Object Drawing.Size(280,38)
+    $message.Font = New-Object Drawing.Font("Segoe UI",10)
+    $message.ForeColor = $C.Muted
+    $splash.Controls.Add($message)
+
+    $progress = New-Object Windows.Forms.ProgressBar
+    $progress.Location = New-Object Drawing.Point(212,166)
+    $progress.Size = New-Object Drawing.Size(280,8)
+    $progress.Style = "Marquee"
+    $progress.MarqueeAnimationSpeed = 24
+    $splash.Controls.Add($progress)
+
+    $tips = @(
+        "Review installed software and resource use.",
+        "Preview temporary files before deleting them.",
+        "Microsoft Defender provides malware scan results.",
+        "Display and power changes stay under Windows control.",
+        "No forced awake cores or thermal-limit bypass."
+    )
+    $state = @{ Index = 0 }
+    $timer = New-Object Windows.Forms.Timer
+    $timer.Interval = 420
+    $timer.Add_Tick({
+        $message.Text = $tips[$state.Index]
+        $state.Index++
+        if ($state.Index -ge $tips.Count) {
+            $timer.Stop()
+            $splash.Close()
+        }
+    })
+    $splash.Add_Shown({ $timer.Start() })
+    [void]$splash.ShowDialog()
+    $timer.Dispose()
+    $splash.Dispose()
+}
+
+Show-CrimsonStartupSplash
 
 $form=New-Object Windows.Forms.Form
 $form.Text="Crimson System Boost - Windows"; $form.StartPosition="CenterScreen"
