@@ -1,6 +1,13 @@
 name: Publish separate Crimson platform releases
 
 on:
+  push:
+    branches:
+      - feature/security-cross-platform-fps
+    paths:
+      - ".github/workflows/publish-release.yml"
+      - "app/**"
+      - "windows/**"
   workflow_dispatch:
 
 permissions:
@@ -28,15 +35,15 @@ jobs:
           test -n "$APK"
           test -s "$APK"
           mkdir -p release-assets
-          cp "$APK" release-assets/Crimson-System-Boost-Android-v0.4.1.apk
+          cp "$APK" release-assets/Crimson-System-Boost-Android-v0.4.2.apk
       - name: Publish Android-only release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v0.4.1-android" release-assets/Crimson-System-Boost-Android-v0.4.1.apk \
+          gh release create "v0.4.2-android" release-assets/Crimson-System-Boost-Android-v0.4.2.apk \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Crimson System Boost v0.4.1 — Android APK" \
+            --title "Crimson System Boost v0.4.2 — Android APK" \
             --prerelease \
             --notes "Standalone Android APK release. Debug-signed preview for direct sideload testing; not Play Store production-signed. Review app permissions and compatibility before installing."
 
@@ -52,8 +59,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "dist" | Out-Null
-          Invoke-PS2EXE -inputFile "windows/Crimson-Windows-GUI.ps1" -outputFile "dist/Crimson-System-Boost-Windows-v0.4.1.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
-          $exe = Get-Item "dist/Crimson-System-Boost-Windows-v0.4.1.exe"
+          Invoke-PS2EXE -inputFile "windows/Crimson-Windows-GUI.ps1" -outputFile "dist/Crimson-System-Boost-Windows-v0.4.2.exe" -noConsole -STA -title "Crimson System Boost" -description "Crimson System Boost Windows desktop utility" -company "Crimson System Boost"
+          $exe = Get-Item "dist/Crimson-System-Boost-Windows-v0.4.2.exe"
           if ($exe.Length -le 0) { throw "EXE output is empty." }
           $stream = [System.IO.File]::OpenRead($exe.FullName)
           try { $mz = New-Object byte[] 2; [void]$stream.Read($mz, 0, 2) } finally { $stream.Dispose() }
@@ -63,4 +70,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release create "v0.4.1-windows" "dist/Crimson-System-Boost-Windows-v0.4.1.exe" --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "Crimson System Boost v0.4.1 — Windows EXE" --prerelease --notes "Standalone Windows desktop EXE release. Unsigned portable executable; Windows SmartScreen may show a warning. No installer is included.";
+          gh release create "v0.4.2-windows" "dist/Crimson-System-Boost-Windows-v0.4.2.exe" --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "Crimson System Boost v0.4.2 — Windows EXE" --prerelease --notes "Standalone Windows desktop EXE release. Unsigned portable executable; Windows SmartScreen may show a warning. No installer is included."
