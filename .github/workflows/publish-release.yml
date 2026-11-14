@@ -1,16 +1,6 @@
 name: Publish separate Crimson platform releases
 
 on:
-  push:
-    branches:
-      - feature/security-cross-platform-fps
-    paths:
-      - ".github/workflows/publish-release.yml"
-      - "app/**"
-      - "build.gradle*"
-      - "settings.gradle*"
-      - "gradle/**"
-      - "windows/**"
   workflow_dispatch:
 
 permissions:
