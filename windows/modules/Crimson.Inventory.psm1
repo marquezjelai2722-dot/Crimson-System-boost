@@ -11,16 +11,30 @@ function Get-CrimsonInstalledSoftware {
     $items = foreach ($root in $roots) {
         try {
             Get-ItemProperty -Path $root -ErrorAction Stop | ForEach-Object {
-                if (-not [string]::IsNullOrWhiteSpace([string]$_.DisplayName)) {
-                    $sizeProperty = $_.PSObject.Properties['EstimatedSize']
-                    $size = if ($sizeProperty -and $sizeProperty.Value) { [long]$sizeProperty.Value * 1KB } else { $null }
+                # Registry uninstall entries are inconsistent. Read optional fields
+                # through PSObject.Properties so one incomplete key cannot stop the scan.
+                try {
+                    $entry = $_
+                    $nameProperty = $entry.PSObject.Properties['DisplayName']
+                    $name = if ($nameProperty) { [string]$nameProperty.Value } else { '' }
+                    if ([string]::IsNullOrWhiteSpace($name)) { return }
+
+                    $versionProperty = $entry.PSObject.Properties['DisplayVersion']
+                    $publisherProperty = $entry.PSObject.Properties['Publisher']
+                    $sizeProperty = $entry.PSObject.Properties['EstimatedSize']
+                    $size = if ($sizeProperty -and $sizeProperty.Value) {
+                        [long]$sizeProperty.Value * 1KB
+                    } else { $null }
+
                     [pscustomobject]@{
-                        Name = [string]$_.DisplayName
-                        Version = [string]$_.DisplayVersion
-                        Publisher = [string]$_.Publisher
+                        Name = $name
+                        Version = if ($versionProperty) { [string]$versionProperty.Value } else { '' }
+                        Publisher = if ($publisherProperty) { [string]$publisherProperty.Value } else { '' }
                         EstimatedBytes = $size
                         LargeFootprint = ($null -ne $size -and $size -ge 1GB)
                     }
+                } catch {
+                    Write-Verbose ("Skipped malformed uninstall entry in " + $root)
                 }
             }
         } catch {
