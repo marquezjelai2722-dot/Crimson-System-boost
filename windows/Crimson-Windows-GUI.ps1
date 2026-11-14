@@ -101,13 +101,9 @@ function Restore-Profile {
     Add-Log "Restored $count process priority setting(s)."
 }
 function Get-TempFiles {
-    $cutoff=(Get-Date).AddDays(-7)
-    $roots=@($env:TEMP,(Join-Path $env:WINDIR "Temp")) | Where-Object {$_ -and (Test-Path $_)} | Select-Object -Unique
-    foreach($root in $roots) {
-        Get-ChildItem -LiteralPath $root -Force -File -ErrorAction SilentlyContinue |
-            Where-Object {$_.LastWriteTime -lt $cutoff}
-    }
+    Get-CrimsonTemporaryFiles -OlderThanDays 7
 }
+
 function Preview-Cleanup {
     $files=@(Get-TempFiles); $bytes=($files | Measure-Object Length -Sum).Sum
     if(-not $bytes){$bytes=0}
@@ -123,9 +119,8 @@ function Clean-Temp {
         ("Delete "+$files.Count+" temporary file(s) older than seven days? Locked files will be skipped."),
         "Confirm cleanup",[Windows.Forms.MessageBoxButtons]::YesNo,[Windows.Forms.MessageBoxIcon]::Warning)
     if($answer -ne [Windows.Forms.DialogResult]::Yes){Add-Log "Cleanup cancelled.";return}
-    $removed=0
-    foreach($f in $files){try{Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop;$removed++}catch{Add-Log ("Skipped locked file: "+$f.Name)}}
-    Add-Log "Deleted $removed temporary file(s)."
+    $result = Remove-CrimsonTemporaryFiles -Files $files -Confirm:$false
+    Add-Log ("Deleted {0} temporary file(s); skipped {1} locked or inaccessible file(s)." -f $result.Removed,$result.Skipped)
 }
 
 
