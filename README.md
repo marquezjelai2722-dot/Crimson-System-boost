@@ -2,13 +2,15 @@
 
 A Windows-first, Rust-based gaming diagnostics and reversible optimization project.
 
-## Current scaffold
+## Current status
 
-- Native desktop dashboard using Rust + egui/eframe.
+This repository contains an early native desktop scaffold, not a finished optimizer or installer.
+
+- Rust + egui/eframe desktop dashboard with Night Ops styling.
 - Live CPU and memory readings through sysinfo.
 - Creates `%USERPROFILE%\\Videos\\Crimson Clips\\Clips` and `Exports` on first launch.
-- Night Ops dark interface with Crimson navigation.
-- Explicit placeholders for Crimson Clips and Crimson Desktop; neither claims to record or modify the Windows shell yet.
+- Crimson Clips and Crimson Desktop are clearly marked as not implemented; no recording or taskbar changes occur.
+- Other optimization pages are placeholders and do not change system settings.
 
 ## Safety contract
 
@@ -24,9 +26,10 @@ A Windows-first, Rust-based gaming diagnostics and reversible optimization proje
 Install the stable Rust toolchain, then run:
 
 ```powershell
-cargo fmt --check
-cargo check
-cargo test
+cargo fmt --all -- --check
+cargo check --all-targets
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
 cargo run
 ```
 
@@ -36,14 +39,24 @@ Windows release build:
 cargo build --release
 ```
 
-The executable is written to `target\\release\\crimson-system-boost.exe`.
+The executable is written to `target\\release\\crimson-system-boost.exe`. Build output is ignored by Git.
+
+## Repository files
+
+- `.gitignore` — excludes Rust build output, local secrets, logs, temporary files, editor state and installer artifacts.
+- `.editorconfig`, `.gitattributes`, `rustfmt.toml` — consistent formatting and line endings.
+- `SECURITY.md` — vulnerability reporting and security invariants.
+- `CONTRIBUTING.md` — development and pull-request rules.
+- `docs/ARCHITECTURE.md` — planned module boundaries and privilege model.
+- `docs/SAFETY_MODEL.md` — mandatory preflight, protected components and rollback policy.
+- `docs/BUILDING.md` — Windows build instructions.
 
 ## Roadmap
 
 1. Monitoring and hardware/OS compatibility detection.
 2. Verified restore-point service and settings snapshots.
 3. Reversible per-setting optimizations with audit logs.
-4. Crimson Clips: validated Medal integration or a dedicated capture backend, tray residency, visible capture state and configurable replay length.
+4. Crimson Clips: validated capture integration, tray residency, visible capture state and configurable replay length.
 5. Crimson Desktop: separately tested Windows 10/11 taskbar customization with restore support.
 6. Installer that creates the clip folders and preserves recordings on uninstall.
 
