@@ -1,0 +1,51 @@
+# Rust build output
+/target/
+**/target/
+
+# Rust-generated and native build artifacts
+*.rlib
+*.rmeta
+*.d
+*.pdb
+*.ilk
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+.local/
+
+# Logs, temporary files and crash dumps
+*.log
+*.tmp
+*.temp
+*.dmp
+*.stackdump
+
+# IDE and editor state
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Installer and packaging output
+/dist/
+/release-output/
+*.msi
+*.msix
+*.appx
+*.zip
