@@ -1,69 +1,120 @@
 # Crimson System Boost
 
-A Windows-first, Rust-based gaming diagnostics and reversible optimization project.
-(I strictly advised to update to windows 10-11 or this won't work. And this pure rust. Just email me if you want to contribute to this project, Make sure you have a repo built using python, or rust and knows how to actually code. But i do advised to know how to use AI to help you or ease your work. But don't be a lazy ass who only knows how to vibecode. Email: MarquezJelai2722@gmail.com)
+A Windows-first gaming diagnostics and optimization project. Written in Rust because apparently I wasn't suffering enough already.
 
-## Current status
-(Not tested by the public yet)
+So, what is this?
 
-This repository contains an early native desktop scaffold, not a finished optimizer or installer.
+Basically, I'm trying to build a Windows utility that monitors your system and helps improve gaming performance without turning your operating system into a crime scene.
+
+No fake FPS boosts. No random registry tweaks from some 2014 YouTube tutorial. No disabling Windows Defender because someone said it gives +300 FPS.
+
+Just actual diagnostics, useful optimizations, and settings you can undo when something inevitably goes wrong.
+
+Still working on it. Still debugging. Still drinking coffee. Probably going to find another bug five minutes after writing this.
+
+Before you contribute
+
+This project targets Windows 10 and Windows 11. Older Windows versions aren't supported. Please update if you're still running something ancient.
+
+Want to help? Email me.
+
+I'm looking for people who actually know what they're doing with Rust. You don't need to be some legendary software engineer, but you should at least understand the code you're submitting.
+
+AI is fine. Use it. Let it help you debug, understand unfamiliar code, or save yourself some time. I use AI too. There's nothing wrong with that.
+
+But please, don't generate 800 lines of code, understand absolutely none of it, and throw it into a pull request. If you can't explain what your code does, you probably shouldn't be submitting it yet.
+
+Learn. Test. Debug. Break things responsibly. Fix them afterward.
+
+Contact: MarquezJelai2722@gmail.com
+
+# Current status
+
+Early development. Not publicly tested. Expect unfinished features.
+
+This isn't some magical one-click FPS booster yet. It's an early desktop scaffold, and I'd rather be honest about that than pretend everything works.
+
+# What's actually implemented:
 
 - Rust + egui/eframe desktop dashboard with Night Ops styling.
-- Live CPU and memory readings through sysinfo.
-- Creates `%USERPROFILE%\\Videos\\Crimson Clips\\Clips` and `Exports` on first launch.
-- Crimson Clips and Crimson Desktop are clearly marked as not implemented; no recording or taskbar changes occur.
-- Other optimization pages are placeholders and do not change system settings.
+- Live CPU and memory readings through "sysinfo".
+- Creates "%USERPROFILE%\Videos\Crimson Clips\Clips" and "Exports" on first launch.
+- Crimson Clips? Not implemented yet. No actual recording.
+- Crimson Desktop? Also not implemented. No taskbar modifications.
+- The other optimization pages? Mostly placeholders. They don't modify Windows settings.
 
-## Safety contract
-(True)
+Yes, there's still a lot to do. I know.
 
-- Windows Defender, Windows Firewall, Windows Update, drivers, Store dependencies and essential services are protected.
-- Every future tweak must check compatibility, create and verify a Windows restore point, snapshot the original setting, log the action and provide a tested undo.
-- If a restore point cannot be created and verified, the associated change must be cancelled.
-- Optional built-in app removal is opt-in and must show purpose and compatibility warnings.
-- Restore points do not back up personal files. They are not a substitute for file backups.
-- No blind registry tweaks, core-parking changes, timer-resolution forcing, or security-feature disabling.
+Safety contract
 
-## Build locally
+I'm not spending all this time building an optimizer just for it to destroy someone's Windows installation.
 
-Install the stable Rust toolchain, then run:
+So here's the deal:
 
-```powershell
+- Windows Defender, Windows Firewall, Windows Update, drivers, Microsoft Store dependencies, and essential services are protected.
+- Every future tweak must check compatibility, create and verify a Windows restore point, save the original setting, log the change, and provide a tested undo option.
+- If a restore point can't be created and verified, the associated change gets cancelled. No shortcuts.
+- Built-in app removal must be optional and explain what it removes and any compatibility risks.
+- Restore points don't back up personal files. Make actual backups.
+- No blind registry tweaks, random core-parking changes, forced timer resolution, or disabling security features for performance.
+
+I want better performance, not a Windows installation that needs an exorcism.
+
+Build locally
+
+You'll need the stable Rust toolchain.
+
+Then run:
+
 cargo fmt --all -- --check
 cargo check --all-targets
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
 cargo run
-```
 
-Windows release build:
+Want the Windows release executable?
 
-```powershell
 cargo build --release
-```
 
-The executable is written to `target\\release\\crimson-system-boost.exe`. Build output is ignored by Git.
+It should appear here:
 
-## Repository files
+target\release\crimson-system-boost.exe
 
-- `.gitignore` — excludes Rust build output, local secrets, logs, temporary files, editor state and installer artifacts.
-- `.editorconfig`, `.gitattributes`, `rustfmt.toml` — consistent formatting and line endings.
-- `SECURITY.md` — vulnerability reporting and security invariants.
-- `CONTRIBUTING.md` — development and pull-request rules.
-- `docs/ARCHITECTURE.md` — planned module boundaries and privilege model.
-- `docs/SAFETY_MODEL.md` — mandatory preflight, protected components and rollback policy.
-- `docs/BUILDING.md` — Windows build instructions.
+Build output is ignored by Git. Because nobody needs a repository full of compiled junk.
 
-## Roadmap
+Repository files
 
-1. Monitoring and hardware/OS compatibility detection.
-2. Verified restore-point service and settings snapshots.
-3. Reversible per-setting optimizations with audit logs.
-4. Crimson Clips: validated capture integration, tray residency, visible capture state and configurable replay length.
-5. Crimson Desktop: separately tested Windows 10/11 taskbar customization with restore support.
-6. Installer that creates the clip folders and preserves recordings on uninstall.
+- ".gitignore" — keeps build output, secrets, logs, temporary files, editor state, and installer artifacts out of Git.
+- ".editorconfig", ".gitattributes", "rustfmt.toml" — keeps formatting and line endings consistent.
+- "SECURITY.md" — security requirements and vulnerability reporting.
+- "CONTRIBUTING.md" — contribution rules. Please read it before opening a PR.
+- "docs/ARCHITECTURE.md" — planned module structure and privilege model.
+- "docs/SAFETY_MODEL.md" — compatibility checks, protected components, and rollback requirements.
+- "docs/BUILDING.md" — Windows build instructions.
 
-## Scope
-(Fact)
+# Roadmap
 
-Windows 10/11 are the target operating systems, but individual features will declare their supported versions. Windows 11 support is not implied for unsupported hardware.
+The stuff I actually want to finish, assuming Windows, Rust, and my remaining brain cells cooperate:
+
+1. System monitoring and hardware/OS compatibility detection.
+2. Restore-point creation and settings snapshots that are actually verified.
+3. Reversible optimizations with proper audit logs.
+4. Crimson Clips — recording integration, tray support, visible recording status, and configurable replay length.
+5. Crimson Desktop — Windows 10/11 taskbar customization with restoration support.
+6. Installer — automatic folder creation without deleting someone's recordings during uninstall.
+
+No imaginary features marked as completed. No pretending a placeholder is a working feature.
+
+# Scope
+
+Windows 10 and Windows 11 are the target operating systems.
+
+Individual features will have their own compatibility requirements. Windows 11 support does not magically make unsupported hardware compatible.
+
+Anyway, that's Crimson System Boost.
+
+It's unfinished. It's probably going to have bugs. There is a lot of work left, and I am fully aware of that.
+
+If you find something broken, report it. If you know how to fix it, even better.
+
+Now excuse me. I have another Rust error to stare at and a coffee that has probably stopped being coffee.
