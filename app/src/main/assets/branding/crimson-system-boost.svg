@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">Crimson System Boost</title>
-  <desc id="desc">A geometric crimson C with a silver performance bolt, on a deep graphite field.</desc>
-  <rect width="512" height="512" rx="84" fill="#0B0D12"/>
-  <path d="M370 82H224c-82 0-148 66-148 148v52c0 82 66 148 148 148h146V344H231c-34 0-61-27-61-61v-54c0-34 27-61 61-61h139V82Z" fill="#C6283D"/>
-  <path d="m287 158-94 111h63l-31 88 119-127h-66l34-72Z" fill="#E6EAF0"/>
-  <path d="M382 118h55v20h-55zM382 374h55v20h-55z" fill="#8793A5"/>
-</svg>
