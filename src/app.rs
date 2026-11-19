@@ -8,20 +8,8 @@ const MUTED: egui::Color32 = egui::Color32::from_rgb(157, 162, 174);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
-    Dashboard,
-    Gaming,
-    CpuGpu,
-    Windows,
-    Startup,
-    Services,
-    Debloat,
-    Cleaner,
-    Network,
-    Scanner,
-    Restore,
-    Logs,
-    Clips,
-    Desktop,
+    Dashboard, Gaming, CpuGpu, Windows, Startup, Services, Debloat, Cleaner,
+    Network, Scanner, Restore, Logs, Clips, Desktop,
 }
 
 impl Page {
@@ -131,7 +119,12 @@ impl CrimsonApp {
 
     fn dashboard(&mut self, ui: &mut egui::Ui) {
         self.system.refresh_all();
-        let cpu = self.system.global_cpu_info().cpu_usage();
+        let cpus = self.system.cpus();
+        let cpu = if cpus.is_empty() {
+            0.0
+        } else {
+            cpus.iter().map(|core| core.cpu_usage()).sum::<f32>() / cpus.len() as f32
+        };
         let memory_total = self.system.total_memory();
         let memory_used = self.system.used_memory();
         let memory_percent = if memory_total > 0 {
@@ -160,7 +153,7 @@ impl CrimsonApp {
         });
 
         ui.add_space(12.0);
-        ui.label("This first scaffold is monitoring-only. Optimization controls will stay unavailable until each action has compatibility checks, snapshots and a tested undo path.");
+        ui.label("This first scaffold is monitoring-only. Optimization controls stay unavailable until each action has compatibility checks, snapshots and a tested undo path.");
     }
 
     fn clips_page(&self, ui: &mut egui::Ui) {
@@ -176,7 +169,7 @@ impl CrimsonApp {
             ui.label(&self.folder_status);
         });
         ui.add_space(8.0);
-        ui.label("Planned integration: Medal-supported replay hotkey or a separately implemented capture backend.");
+        ui.label("Planned integration: supported Medal replay control or a dedicated capture backend.");
         ui.label("The app will only show CAPTURING after it can verify that a recorder is actually active.");
     }
 
@@ -187,7 +180,7 @@ impl CrimsonApp {
         ui.bullet_text("Windows 10 and Windows 11 require separate compatibility paths.");
         ui.bullet_text("Centered pinned apps, left-side Start, hidden search and taskbar transparency need version-aware testing.");
         ui.bullet_text("No Explorer replacement or unsupported shell patch will be applied automatically.");
-        ui.bullet_text("A restore option and original-layout snapshot are required before any customization.");
+        ui.bullet_text("A restore option and original-layout snapshot are required before customization.");
     }
 }
 
