@@ -1,6 +1,7 @@
 # Crimson System Boost
 
 A Windows-first, Rust-based gaming diagnostics and reversible optimization project.
+(I strictly advised to update to windows 10-11 or this won't work. And this pure rust. Just email me if you want to contribute to this project, Make sure you have a repo built using python, or rust and knows how to actually code. But i do advised to know how to use AI to help you or ease your work. But don't be a lazy ass who only knows how to vibecode. Email: MarquezJelai2722@gmail.com)
 
 ## Current status
 
