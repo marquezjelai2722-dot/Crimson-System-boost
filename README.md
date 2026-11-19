@@ -4,6 +4,7 @@ A Windows-first, Rust-based gaming diagnostics and reversible optimization proje
 (I strictly advised to update to windows 10-11 or this won't work. And this pure rust. Just email me if you want to contribute to this project, Make sure you have a repo built using python, or rust and knows how to actually code. But i do advised to know how to use AI to help you or ease your work. But don't be a lazy ass who only knows how to vibecode. Email: MarquezJelai2722@gmail.com)
 
 ## Current status
+(Not tested by the public yet)
 
 This repository contains an early native desktop scaffold, not a finished optimizer or installer.
 
@@ -14,6 +15,7 @@ This repository contains an early native desktop scaffold, not a finished optimi
 - Other optimization pages are placeholders and do not change system settings.
 
 ## Safety contract
+(True)
 
 - Windows Defender, Windows Firewall, Windows Update, drivers, Store dependencies and essential services are protected.
 - Every future tweak must check compatibility, create and verify a Windows restore point, snapshot the original setting, log the action and provide a tested undo.
@@ -62,5 +64,6 @@ The executable is written to `target\\release\\crimson-system-boost.exe`. Build 
 6. Installer that creates the clip folders and preserves recordings on uninstall.
 
 ## Scope
+(Fact)
 
 Windows 10/11 are the target operating systems, but individual features will declare their supported versions. Windows 11 support is not implied for unsupported hardware.
