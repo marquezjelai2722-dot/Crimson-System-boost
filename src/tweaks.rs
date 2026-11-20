@@ -54,8 +54,7 @@ impl TweakId {
 mod windows {
     use super::{Preset, TweakId};
     use std::{
-        fs,
-        io,
+        fs, io,
         path::{Path, PathBuf},
         process::Command,
         time::{SystemTime, UNIX_EPOCH},
@@ -142,8 +141,9 @@ mod windows {
     }
 
     fn backup_dir() -> Result<PathBuf, String> {
-        let local_app_data = std::env::var_os("LOCALAPPDATA")
-            .ok_or_else(|| "LOCALAPPDATA is unavailable; cannot create a safe backup.".to_owned())?;
+        let local_app_data = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
+            "LOCALAPPDATA is unavailable; cannot create a safe backup.".to_owned()
+        })?;
         let directory = PathBuf::from(local_app_data)
             .join("Crimson System Boost")
             .join("Backups");
@@ -232,12 +232,7 @@ mod windows {
         let key = match root.open_subkey_with_flags(target.key, KEY_READ) {
             Ok(key) => key,
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => {
-                return Err(format!(
-                    "Could not read HKCU\\{}: {error}",
-                    target.key
-                ))
-            }
+            Err(error) => return Err(format!("Could not read HKCU\\{}: {error}", target.key)),
         };
         match key.get_raw_value(target.name) {
             Ok(value) => {
@@ -432,8 +427,11 @@ mod windows {
             .filter_map(Result::ok)
             .map(|entry| entry.path())
             .filter(|path| {
-                path.extension().is_some_and(|extension| extension == "snapshot")
-                    && path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("apply-"))
+                path.extension()
+                    .is_some_and(|extension| extension == "snapshot")
+                    && path
+                        .file_name()
+                        .is_some_and(|name| name.to_string_lossy().starts_with("apply-"))
             })
             .collect();
         backups.sort_by_key(|path| {
