@@ -19,7 +19,7 @@ pub enum TweakId {
 }
 
 impl TweakId {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 7] = [
         Self::GameCaptureOff,
         Self::GameModeOn,
         Self::TransparencyOff,
@@ -127,6 +127,24 @@ mod windows {
         key: "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects",
         name: "VisualFXSetting",
         desired: 2,
+    }];
+
+    const CONSUMER_FEATURES: [Target; 1] = [Target {
+        key: "Software\\Policies\\Microsoft\\Windows\\CloudContent",
+        name: "DisableWindowsConsumerFeatures",
+        desired: 1,
+    }];
+
+    const APP_SUGGESTIONS: [Target; 1] = [Target {
+        key: "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        name: "SystemPaneSuggestionsEnabled",
+        desired: 0,
+    }];
+
+    const WINDOWS_TIPS: [Target; 1] = [Target {
+        key: "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        name: "SubscribedContent-338389Enabled",
+        desired: 0,
     }];
 
     fn targets(id: TweakId) -> &'static [Target] {
