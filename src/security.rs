@@ -70,8 +70,8 @@ pub fn run_defender_scan(target: &Path) -> String {
     let mut child = match Command::new(cli)
         .args(["-Scan", "-ScanType", "3", "-File"])
         .arg(target)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
     {
         Ok(child) => child,
@@ -99,12 +99,12 @@ pub fn run_defender_scan(target: &Path) -> String {
         }
     }
 
-    match child.wait_with_output() {
-        Ok(output) if output.status.success() => {
-            format!("Defender custom scan finished (exit code {}). Check Windows Security → Protection history for detections.", output.status.code().unwrap_or(0))
+    match child.wait() {
+        Ok(status) if status.success() => {
+            format!("Defender custom scan finished (exit code {}). Check Windows Security → Protection history for detections.", status.code().unwrap_or(0))
         }
-        Ok(output) => {
-            format!("Defender scan did not complete successfully (exit code {:?}). Check Windows Security → Protection history. No firewall settings were changed.", output.status.code())
+        Ok(status) => {
+            format!("Defender scan did not complete successfully (exit code {:?}). Check Windows Security → Protection history. No firewall settings were changed.", status.code())
         }
         Err(error) => format!("Could not collect Microsoft Defender scan result: {error}"),
     }
