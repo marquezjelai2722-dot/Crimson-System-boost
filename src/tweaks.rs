@@ -13,6 +13,9 @@ pub enum TweakId {
     GameModeOn,
     TransparencyOff,
     VisualEffectsPerformance,
+    DisableConsumerFeatures,
+    DisableAppSuggestions,
+    DisableWindowsTips,
 }
 
 impl TweakId {
@@ -21,6 +24,9 @@ impl TweakId {
         Self::GameModeOn,
         Self::TransparencyOff,
         Self::VisualEffectsPerformance,
+        Self::DisableConsumerFeatures,
+        Self::DisableAppSuggestions,
+        Self::DisableWindowsTips,
     ];
 
     pub fn label(self) -> &'static str {
@@ -29,6 +35,9 @@ impl TweakId {
             Self::GameModeOn => "Enable Windows Game Mode",
             Self::TransparencyOff => "Disable transparency effects",
             Self::VisualEffectsPerformance => "Prioritize visual performance",
+            Self::DisableConsumerFeatures => "Disable Windows consumer experiences",
+            Self::DisableAppSuggestions => "Disable Start menu app suggestions",
+            Self::DisableWindowsTips => "Disable Windows tips and suggestions",
         }
     }
 
@@ -45,6 +54,15 @@ impl TweakId {
             }
             Self::VisualEffectsPerformance => {
                 "Selects Windows visual-effects performance mode. Animations and visual polish may be reduced."
+            }
+            Self::DisableConsumerFeatures => {
+                "Turns off Windows consumer-experience suggestions for the current user. It does not disable Windows Update or security features."
+            }
+            Self::DisableAppSuggestions => {
+                "Turns off suggested apps in the Start menu for the current user."
+            }
+            Self::DisableWindowsTips => {
+                "Turns off Windows tips and suggested-content notifications for the current user."
             }
         }
     }
@@ -117,6 +135,9 @@ mod windows {
             TweakId::GameModeOn => &GAME_MODE,
             TweakId::TransparencyOff => &TRANSPARENCY,
             TweakId::VisualEffectsPerformance => &VISUAL_EFFECTS,
+            TweakId::DisableConsumerFeatures => &CONSUMER_FEATURES,
+            TweakId::DisableAppSuggestions => &APP_SUGGESTIONS,
+            TweakId::DisableWindowsTips => &WINDOWS_TIPS,
         }
     }
 
@@ -126,6 +147,9 @@ mod windows {
             TweakId::GameModeOn => "game_mode_on",
             TweakId::TransparencyOff => "transparency_off",
             TweakId::VisualEffectsPerformance => "visual_effects_performance",
+            TweakId::DisableConsumerFeatures => "disable_consumer_features",
+            TweakId::DisableAppSuggestions => "disable_app_suggestions",
+            TweakId::DisableWindowsTips => "disable_windows_tips",
         }
     }
 
