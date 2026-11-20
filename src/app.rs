@@ -1,5 +1,6 @@
 #[path = "security.rs"]
 mod security;
+mod diagnostics;
 #[path = "tweaks.rs"]
 mod tweaks;
 
@@ -77,6 +78,10 @@ pub struct CrimsonApp {
     optimization_running: bool,
     optimization_status: String,
     selected_tweaks: [bool; 7],
+    network_host: String,
+    network_result: String,
+    startup_result: String,
+    cleanup_result: String,
 }
 
 impl Default for CrimsonApp {
@@ -132,6 +137,10 @@ impl Default for CrimsonApp {
             optimization_running: false,
             optimization_status: "No optimization has been applied in this session.".to_owned(),
             selected_tweaks: [true, true, true, false, false, false, false],
+            network_host: "example.com".to_owned(),
+            network_result: "Run a DNS lookup and four-packet ping test against a hostname.".to_owned(),
+            startup_result: "Startup inventory has not been scanned.".to_owned(),
+            cleanup_result: "Temporary-file preview has not been run.".to_owned(),
         }
     }
 }
@@ -388,6 +397,43 @@ impl CrimsonApp {
         ui.label("A restore point and exact original registry values are saved before changes. Undo restores missing values by deleting only the values Crimson created.");
     }
 
+    fn startup_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Startup inventory");
+        ui.label("Read-only inventory of common Windows Run and RunOnce registry locations. Crimson does not disable or delete startup entries.");
+        if ui.button("Scan startup entries").clicked() {
+            self.startup_result = diagnostics::startup_inventory()
+                .unwrap_or_else(|error| format!("Inventory failed: {error}"));
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.startup_result).monospace());
+    }
+
+    fn cleaner_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Temporary-file cleanup preview");
+        ui.label("This first pass measures top-level files in the current user's TEMP folder. It does not delete anything.");
+        if ui.button("Scan temporary files").clicked() {
+            self.cleanup_result = diagnostics::cleanup_preview()
+                .unwrap_or_else(|error| format!("Preview failed: {error}"));
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.cleanup_result).monospace());
+    }
+
+    fn network_diagnostics_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("DNS and latency diagnostics");
+        ui.label("Enter a hostname to perform a bounded DNS lookup and four-packet ping test. This does not change DNS servers, adapters or firewall rules.");
+        ui.horizontal(|ui| {
+            ui.label("Host");
+            ui.text_edit_singleline(&mut self.network_host);
+            if ui.button("Run test").clicked() {
+                self.network_result = diagnostics::network_test(&self.network_host)
+                    .unwrap_or_else(|error| format!("Test failed: {error}"));
+            }
+        });
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.network_result).monospace());
+    }
+
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
             ui.add_space(12.0);
@@ -480,11 +526,11 @@ impl CrimsonApp {
         ui.add_space(20.0);
         ui.group(|ui| {
             ui.label(egui::RichText::new("Safety policy").strong().color(CRIMSON));
-            ui.label("System-changing features remain disabled until compatibility checks, snapshots and tested rollback are implemented.");
+            ui.label("Crimson includes reversible registry profiles plus read-only startup, cleanup and network diagnostics. Destructive cleanup and service changes remain disabled until individually verified.");
             ui.label("Microsoft Defender and Windows Firewall are never disabled or reconfigured by this build.");
         });
         ui.add_space(12.0);
-        ui.label("This build is monitoring-only. Optimization controls stay unavailable until each action has compatibility checks, snapshots and a tested undo path.");
+        ui.label("Available now: OneClick and Platinum+ registry profiles, individual reversible tweaks, startup inventory, temporary-file preview, and DNS/ping diagnostics.");
     }
 
     fn scanner_page(&mut self, ui: &mut egui::Ui) {
@@ -654,7 +700,9 @@ impl eframe::App for CrimsonApp {
                 Page::Gaming => self.gaming_page(ui),
                 Page::Windows => self.windows_tweaks_page(ui),
                 Page::CpuGpu => self.cpu_gpu_page(ui),
-                Page::Network => self.network_page(ui),
+                Page::Startup => self.startup_page(ui),
+                Page::Cleaner => self.cleaner_page(ui),
+                Page::Network => self.network_diagnostics_page(ui),
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
                 page => {
