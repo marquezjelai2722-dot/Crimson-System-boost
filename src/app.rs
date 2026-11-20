@@ -329,6 +329,26 @@ impl eframe::App for CrimsonApp {
         style.visuals.selection.bg_fill = CRIMSON;
         ctx.set_style(style);
 
+        if self.integrity_tampered {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::default().fill(egui::Color32::from_rgb(8, 8, 10)))
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(70.0);
+                        ui.heading(egui::RichText::new("☠").size(112.0).color(egui::Color32::from_rgb(220, 35, 48)));
+                        ui.add_space(12.0);
+                        ui.heading(egui::RichText::new("CRIMSON INTEGRITY FAILURE").strong().color(egui::Color32::from_rgb(220, 35, 48)));
+                        ui.add_space(12.0);
+                        ui.label(egui::RichText::new("The running executable no longer matches its launch-time fingerprint.").color(egui::Color32::WHITE));
+                        ui.label(egui::RichText::new("Crimson has locked its controls. No Windows settings, firewall rules, or other applications were changed.").color(MUTED));
+                        ui.add_space(18.0);
+                        ui.label(egui::RichText::new("Close Crimson and reinstall from a trusted, verified release.").strong().color(egui::Color32::WHITE));
+                        ui.label(egui::RichText::new("Automatic file repair is unavailable until a signed installer and independent recovery helper are configured.").small().color(MUTED));
+                    });
+                });
+            return;
+        }
+
         egui::SidePanel::left("navigation").resizable(false).exact_width(205.0)
             .show(ctx, |ui| self.sidebar(ui));
         egui::CentralPanel::default().show(ctx, |ui| {
