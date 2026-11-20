@@ -18,20 +18,39 @@ const METRICS_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
-    Dashboard, Gaming, CpuGpu, Windows, Startup, Services, Debloat, Cleaner,
-    Network, Scanner, Restore, Logs, Clips, Desktop,
+    Dashboard,
+    Gaming,
+    CpuGpu,
+    Windows,
+    Startup,
+    Services,
+    Debloat,
+    Cleaner,
+    Network,
+    Scanner,
+    Restore,
+    Logs,
+    Clips,
+    Desktop,
 }
 
 impl Page {
     fn label(self) -> &'static str {
         match self {
-            Self::Dashboard => "Dashboard", Self::Gaming => "Gaming Boost",
-            Self::CpuGpu => "CPU & GPU", Self::Windows => "Windows Tweaks",
-            Self::Startup => "Startup", Self::Services => "Services",
-            Self::Debloat => "Optional Apps", Self::Cleaner => "Cleaner",
-            Self::Network => "Network", Self::Scanner => "Scanner",
-            Self::Restore => "Restore", Self::Logs => "Activity Logs",
-            Self::Clips => "Crimson Clips", Self::Desktop => "Crimson Desktop",
+            Self::Dashboard => "Dashboard",
+            Self::Gaming => "Gaming Boost",
+            Self::CpuGpu => "CPU & GPU",
+            Self::Windows => "Windows Tweaks",
+            Self::Startup => "Startup",
+            Self::Services => "Services",
+            Self::Debloat => "Optional Apps",
+            Self::Cleaner => "Cleaner",
+            Self::Network => "Network",
+            Self::Scanner => "Scanner",
+            Self::Restore => "Restore",
+            Self::Logs => "Activity Logs",
+            Self::Clips => "Crimson Clips",
+            Self::Desktop => "Crimson Desktop",
         }
     }
 }
@@ -68,7 +87,8 @@ impl Default for CrimsonApp {
             }
             None => (
                 PathBuf::new(),
-                "Could not determine the Videos directory; clip folders were not created.".to_owned(),
+                "Could not determine the Videos directory; clip folders were not created."
+                    .to_owned(),
             ),
         };
         let executable = std::env::current_exe().ok();
@@ -127,7 +147,8 @@ impl CrimsonApp {
         else {
             self.integrity_tampered = true;
             self.integrity_status =
-                "Integrity cannot be verified: executable baseline is missing. Crimson is locked.".to_owned();
+                "Integrity cannot be verified: executable baseline is missing. Crimson is locked."
+                    .to_owned();
             return;
         };
 
@@ -139,13 +160,13 @@ impl CrimsonApp {
             Ok(_) => {
                 self.integrity_tampered = true;
                 self.integrity_status =
-                    "WARNING: executable bytes changed after launch. Sensitive actions are locked.".to_owned();
+                    "WARNING: executable bytes changed after launch. Sensitive actions are locked."
+                        .to_owned();
             }
             Err(error) => {
                 self.integrity_tampered = true;
-                self.integrity_status = format!(
-                    "Integrity verification failed: {error}. Crimson is locked."
-                );
+                self.integrity_status =
+                    format!("Integrity verification failed: {error}. Crimson is locked.");
             }
         }
     }
@@ -184,13 +205,20 @@ impl CrimsonApp {
             });
             ui.add_space(16.0);
             let sections: &[(Page, &str)] = &[
-                (Page::Dashboard, "CORE"), (Page::Gaming, "Gaming Boost"),
-                (Page::CpuGpu, "CPU & GPU"), (Page::Windows, "Windows Tweaks"),
-                (Page::Startup, "Startup"), (Page::Services, "Services"),
-                (Page::Debloat, "Optional Apps"), (Page::Cleaner, "Cleaner"),
-                (Page::Network, "Network"), (Page::Scanner, "Scanner"),
-                (Page::Restore, "Restore"), (Page::Logs, "Activity Logs"),
-                (Page::Clips, "Crimson Clips"), (Page::Desktop, "Crimson Desktop"),
+                (Page::Dashboard, "CORE"),
+                (Page::Gaming, "Gaming Boost"),
+                (Page::CpuGpu, "CPU & GPU"),
+                (Page::Windows, "Windows Tweaks"),
+                (Page::Startup, "Startup"),
+                (Page::Services, "Services"),
+                (Page::Debloat, "Optional Apps"),
+                (Page::Cleaner, "Cleaner"),
+                (Page::Network, "Network"),
+                (Page::Scanner, "Scanner"),
+                (Page::Restore, "Restore"),
+                (Page::Logs, "Activity Logs"),
+                (Page::Clips, "Crimson Clips"),
+                (Page::Desktop, "Crimson Desktop"),
             ];
             for (page, label) in sections {
                 if *label == "CORE" {
@@ -199,7 +227,9 @@ impl CrimsonApp {
                 }
                 let selected = self.page == *page;
                 let text = if selected {
-                    egui::RichText::new(*label).strong().color(egui::Color32::WHITE)
+                    egui::RichText::new(*label)
+                        .strong()
+                        .color(egui::Color32::WHITE)
                 } else {
                     egui::RichText::new(*label).color(MUTED)
                 };
@@ -208,7 +238,11 @@ impl CrimsonApp {
                 }
             }
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-                ui.label(egui::RichText::new("NIGHT OPS  •  v0.1.0").small().color(MUTED));
+                ui.label(
+                    egui::RichText::new("NIGHT OPS  •  v0.1.0")
+                        .small()
+                        .color(MUTED),
+                );
             });
         });
     }
@@ -229,15 +263,28 @@ impl CrimsonApp {
         };
 
         ui.heading("System overview");
-        ui.label(egui::RichText::new("Live readings from this PC. No fabricated FPS or GPU values.").color(MUTED));
+        ui.label(
+            egui::RichText::new("Live readings from this PC. No fabricated FPS or GPU values.")
+                .color(MUTED),
+        );
         ui.add_space(14.0);
-        egui::Grid::new("metrics").num_columns(3).spacing([12.0, 12.0]).show(ui, |ui| {
-            metric(ui, "CPU usage", format!("{cpu:.1}%"));
-            metric(ui, "Memory used", format!("{memory_percent:.1}%"));
-            metric(ui, "Memory", format!("{:.1} / {:.1} GB",
-                memory_used as f64 / 1_073_741_824.0, memory_total as f64 / 1_073_741_824.0));
-            ui.end_row();
-        });
+        egui::Grid::new("metrics")
+            .num_columns(3)
+            .spacing([12.0, 12.0])
+            .show(ui, |ui| {
+                metric(ui, "CPU usage", format!("{cpu:.1}%"));
+                metric(ui, "Memory used", format!("{memory_percent:.1}%"));
+                metric(
+                    ui,
+                    "Memory",
+                    format!(
+                        "{:.1} / {:.1} GB",
+                        memory_used as f64 / 1_073_741_824.0,
+                        memory_total as f64 / 1_073_741_824.0
+                    ),
+                );
+                ui.end_row();
+            });
         ui.add_space(20.0);
         ui.group(|ui| {
             ui.label(egui::RichText::new("Safety policy").strong().color(CRIMSON));
@@ -253,8 +300,16 @@ impl CrimsonApp {
         ui.label("Crimson checks whether its running executable changes after launch. This is a runtime tamper alarm, not proof that the downloaded file was authentic before launch.");
         ui.add_space(10.0);
         ui.group(|ui| {
-            ui.label(egui::RichText::new("Executable integrity").strong().color(CRIMSON));
-            let color = if self.integrity_tampered { egui::Color32::RED } else { MUTED };
+            ui.label(
+                egui::RichText::new("Executable integrity")
+                    .strong()
+                    .color(CRIMSON),
+            );
+            let color = if self.integrity_tampered {
+                egui::Color32::RED
+            } else {
+                MUTED
+            };
             ui.label(egui::RichText::new(&self.integrity_status).color(color));
             ui.label("The SHA-256 baseline is captured at startup and checked once per minute.");
         });
@@ -278,7 +333,9 @@ impl CrimsonApp {
 
     fn network_page(&self, ui: &mut egui::Ui) {
         ui.heading("Windows network protection");
-        ui.label("Crimson does not add, remove, or modify Windows Defender Firewall rules or profiles.");
+        ui.label(
+            "Crimson does not add, remove, or modify Windows Defender Firewall rules or profiles.",
+        );
         ui.label("This app does not open a listening network port, host a server, or require inbound connections.");
         ui.label("Microsoft Defender Antivirus scans files. Windows Defender Firewall filters network traffic. They are separate Windows security components, and Crimson leaves the firewall configuration alone.");
         ui.add_space(10.0);
@@ -306,8 +363,12 @@ impl CrimsonApp {
         ui.label("Windows taskbar and wallpaper customization is not enabled in this scaffold.");
         ui.add_space(8.0);
         ui.label("• Windows 10 and Windows 11 require separate compatibility paths.");
-        ui.label("• No Explorer replacement or unsupported shell patch will be applied automatically.");
-        ui.label("• A restore option and original-layout snapshot are required before customization.");
+        ui.label(
+            "• No Explorer replacement or unsupported shell patch will be applied automatically.",
+        );
+        ui.label(
+            "• A restore option and original-layout snapshot are required before customization.",
+        );
     }
 }
 
@@ -356,7 +417,9 @@ impl eframe::App for CrimsonApp {
             return;
         }
 
-        egui::SidePanel::left("navigation").resizable(false).exact_width(205.0)
+        egui::SidePanel::left("navigation")
+            .resizable(false)
+            .exact_width(205.0)
             .show(ctx, |ui| self.sidebar(ui));
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
@@ -369,7 +432,10 @@ impl eframe::App for CrimsonApp {
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
                 page => {
-                    ui.label(format!("{} module is planned but not implemented yet.", page.label()));
+                    ui.label(format!(
+                        "{} module is planned but not implemented yet.",
+                        page.label()
+                    ));
                     ui.label("No system settings have been changed.");
                 }
             });
