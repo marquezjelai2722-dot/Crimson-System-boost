@@ -3,8 +3,9 @@ name = "crimson-system-boost"
 version = "0.1.0"
 edition = "2021"
 description = "A reversible Windows gaming optimizer and desktop utility."
-license = "MIT"
+license-file = "LICENSE"
 
 [dependencies]
 eframe = { version = "0.29", default-features = true }
+sha2 = "0.10"
 sysinfo = "0.33"
