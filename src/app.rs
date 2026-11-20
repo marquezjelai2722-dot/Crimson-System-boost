@@ -54,12 +54,21 @@ pub struct CrimsonApp {
 
 impl Default for CrimsonApp {
     fn default() -> Self {
-        let clips_dir = videos_dir().join("Crimson Clips");
-        let folder_status = match std::fs::create_dir_all(clips_dir.join("Clips"))
-            .and_then(|_| std::fs::create_dir_all(clips_dir.join("Exports")))
-        {
-            Ok(()) => format!("Clip folders ready: {}", clips_dir.display()),
-            Err(error) => format!("Could not create clip folders: {error}"),
+        let (clips_dir, folder_status) = match videos_dir() {
+            Some(videos) => {
+                let directory = videos.join("Crimson Clips");
+                let status = match std::fs::create_dir_all(directory.join("Clips"))
+                    .and_then(|_| std::fs::create_dir_all(directory.join("Exports")))
+                {
+                    Ok(()) => format!("Clip folders ready: {}", directory.display()),
+                    Err(error) => format!("Could not create clip folders: {error}"),
+                };
+                (directory, status)
+            }
+            None => (
+                PathBuf::new(),
+                "Could not determine the Videos directory; clip folders were not created.".to_owned(),
+            ),
         };
         let executable = std::env::current_exe().ok();
         let integrity_baseline = executable
@@ -91,14 +100,10 @@ impl Default for CrimsonApp {
     }
 }
 
-fn videos_dir() -> PathBuf {
-    if let Ok(profile) = std::env::var("USERPROFILE") {
-        PathBuf::from(profile).join("Videos")
-    } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join("Videos")
-    } else {
-        PathBuf::from(".")
-    }
+fn videos_dir() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(|profile| PathBuf::from(profile).join("Videos"))
 }
 
 impl CrimsonApp {
