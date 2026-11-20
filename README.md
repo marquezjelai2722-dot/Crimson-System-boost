@@ -39,6 +39,7 @@ This isn't some magical one-click FPS booster yet. It's an early desktop scaffol
 - Rust + egui/eframe desktop dashboard with Night Ops styling.
 - CPU and memory readings through "sysinfo", refreshed once per second rather than on every UI frame.
 - SHA-256 runtime integrity check of the running executable, checked once per minute against a baseline captured at launch.
+- Full-screen red/black lockout warning when the running executable changes after launch; this is detection only, not automatic repair.
 - Optional Microsoft Defender custom scan of the running executable through Microsoft's MpCmdRun utility.
 - No Windows Defender Firewall rules or profiles are changed, and the app does not open inbound network ports.
 - Creates "%USERPROFILE%\Videos\Crimson Clips\Clips" and "Exports" on first launch when a user profile path is available.
