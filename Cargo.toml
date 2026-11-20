@@ -9,3 +9,6 @@ license-file = "LICENSE"
 eframe = { version = "0.29", default-features = true }
 sha2 = "0.10"
 sysinfo = "0.33"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
