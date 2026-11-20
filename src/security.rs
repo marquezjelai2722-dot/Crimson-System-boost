@@ -118,11 +118,11 @@ pub fn run_defender_scan(_target: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::sha256_file;
-    use std::{fs, path::PathBuf};
+    use std::fs;
 
     #[test]
     fn sha256_matches_known_vector() {
-        let path = PathBuf::from(std::env::temp_dir())
+        let path = std::env::temp_dir()
             .join(format!("crimson-sha256-test-{}.tmp", std::process::id()));
         fs::write(&path, b"abc").expect("write test file");
 
