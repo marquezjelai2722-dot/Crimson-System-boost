@@ -38,8 +38,10 @@ fn defender_cli() -> Option<PathBuf> {
             for entry in entries.flatten() {
                 let candidate = entry.path().join("MpCmdRun.exe");
                 if let Ok(metadata) = candidate.metadata() {
-                    let modified = metadata.modified().unwrap_or(UNIX_EPOCH);
-                    candidates.push((modified, candidate));
+                    if metadata.is_file() {
+                        let modified = metadata.modified().unwrap_or(UNIX_EPOCH);
+                        candidates.push((modified, candidate));
+                    }
                 }
             }
         }
@@ -63,18 +65,46 @@ pub fn run_defender_scan(target: &Path) -> String {
         return "Microsoft Defender command-line scanner was not found. Check that Microsoft Defender Antivirus is installed and enabled.".to_owned();
     };
 
-    match Command::new(cli)
+    let mut child = match Command::new(cli)
         .args(["-Scan", "-ScanType", "3", "-File"])
         .arg(target)
-        .output()
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
     {
+        Ok(child) => child,
+        Err(error) => return format!("Could not start Microsoft Defender: {error}"),
+    };
+
+    // A stuck Defender process must not leave the scan UI permanently busy.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return "Microsoft Defender scan timed out after 30 seconds. Check Windows Security for scan status.".to_owned();
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return format!("Could not monitor Microsoft Defender scan: {error}");
+            }
+        }
+    }
+
+    match child.wait_with_output() {
         Ok(output) if output.status.success() => {
-            format!("Defender custom scan finished successfully (exit code {}). Check Windows Security → Protection history for any detections.", output.status.code().unwrap_or(0))
+            format!("Defender custom scan finished (exit code {}). Check Windows Security → Protection history for detections.", output.status.code().unwrap_or(0))
         }
         Ok(output) => {
             format!("Defender scan did not complete successfully (exit code {:?}). Check Windows Security → Protection history. No firewall settings were changed.", output.status.code())
         }
-        Err(error) => format!("Could not start Microsoft Defender: {error}"),
+        Err(error) => format!("Could not collect Microsoft Defender scan result: {error}"),
     }
 }
 
