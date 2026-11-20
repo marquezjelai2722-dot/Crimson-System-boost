@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-The current desktop executable captures a SHA-256 fingerprint of its own executable at process startup and checks it every 60 seconds. If the file changes while the process is running, Crimson locks its controls and displays a full-screen integrity warning.
+The current desktop executable captures a SHA-256 fingerprint of its own executable at process startup, verifies it on the first UI update, and repeats the check every 60 seconds. A mismatch or an inability to read and hash the executable locks Crimson and displays a full-screen integrity warning.
 
 This detects a change relative to the current session. It does **not** prove that the downloaded executable was authentic before its first launch, and it cannot distinguish a malicious modification from a legitimate replacement without a trusted release identity.
 
