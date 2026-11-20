@@ -1,10 +1,16 @@
-name: Publish Windows Release
+name: Build and publish Windows installer
 
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to create/publish (for example v1.0.0)"
+        required: true
+        default: "v1.0.0"
+        type: string
 
 permissions:
   contents: write
@@ -15,6 +21,24 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
+
+      - name: Determine release version
+        id: release_meta
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.release_tag }}".Trim()
+          } else {
+            $tag = "${{ github.ref_name }}".Trim()
+          }
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$') {
+            throw "Invalid release tag: $tag"
+          }
+          $version = $tag.Substring(1)
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
@@ -22,19 +46,44 @@ jobs:
       - name: Verify formatting
         run: cargo fmt --all -- --check
 
-      - name: Build optimized Windows executable
+      - name: Build optimized Windows x64 executable
         run: cargo build --release --bin crimson-system-boost
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup compiler was not found at $iscc"
+          }
+          & $iscc "/DMyAppVersion=${{ steps.release_meta.outputs.version }}" "installer\CrimsonSystemBoost.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE"
+          }
+          $setup = "installer\Output\Crimson-System-Boost-Setup-v${{ steps.release_meta.outputs.version }}.exe"
+          if (-not (Test-Path $setup)) {
+            throw "Installer output is missing: $setup"
+          }
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Crimson System Boost ${{ github.ref_name }} — Windows
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: main
+          name: Crimson System Boost ${{ steps.release_meta.outputs.tag }} — Windows
           body: |
-            Windows x64 build of Crimson System Boost.
+            Windows x64 installer for Crimson System Boost.
 
-            This is an early monitoring and security-integration scaffold. It does not modify Windows Firewall rules or apply system optimizations.
-          files: target/release/crimson-system-boost.exe
+            Install location: per-user Programs folder. The installer creates Start Menu shortcuts and includes an uninstaller.
+
+            This is an early monitoring and security-integration build. Several optimization pages are placeholders; it does not currently apply Windows optimizations or modify Windows Firewall rules.
+          files: |
+            installer/Output/Crimson-System-Boost-Setup-v${{ steps.release_meta.outputs.version }}.exe
+            target/release/crimson-system-boost.exe
           draft: false
           prerelease: true
           make_latest: false
