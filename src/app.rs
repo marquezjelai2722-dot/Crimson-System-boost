@@ -76,7 +76,7 @@ pub struct CrimsonApp {
     optimization_rx: Receiver<String>,
     optimization_running: bool,
     optimization_status: String,
-    selected_tweaks: [bool; 4],
+    selected_tweaks: [bool; 7],
 }
 
 impl Default for CrimsonApp {
@@ -131,7 +131,7 @@ impl Default for CrimsonApp {
             optimization_rx,
             optimization_running: false,
             optimization_status: "No optimization has been applied in this session.".to_owned(),
-            selected_tweaks: [true, true, true, false],
+            selected_tweaks: [true, true, true, false, false, false, false],
         }
     }
 }
@@ -340,6 +340,29 @@ impl CrimsonApp {
             );
             ui.label(tweaks::TweakId::VisualEffectsPerformance.description());
         });
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new("Privacy and distractions")
+                    .strong()
+                    .color(CRIMSON),
+            );
+            ui.checkbox(
+                &mut self.selected_tweaks[4],
+                tweaks::TweakId::DisableConsumerFeatures.label(),
+            );
+            ui.label(tweaks::TweakId::DisableConsumerFeatures.description());
+            ui.checkbox(
+                &mut self.selected_tweaks[5],
+                tweaks::TweakId::DisableAppSuggestions.label(),
+            );
+            ui.label(tweaks::TweakId::DisableAppSuggestions.description());
+            ui.checkbox(
+                &mut self.selected_tweaks[6],
+                tweaks::TweakId::DisableWindowsTips.label(),
+            );
+            ui.label(tweaks::TweakId::DisableWindowsTips.description());
+        });
 
         let enabled = !self.optimization_running;
         let mut apply = false;
@@ -361,7 +384,7 @@ impl CrimsonApp {
             ui.spinner();
         }
         ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
-        ui.label("Each batch is limited to the four listed HKCU DWORD settings. No services, drivers, Defender, Firewall, Windows Update, or installed apps are modified.");
+        ui.label("Each batch is limited to seven allow-listed HKCU DWORD settings. No services, drivers, Defender, Firewall, Windows Update, or installed apps are modified.");
         ui.label("A restore point and exact original registry values are saved before changes. Undo restores missing values by deleting only the values Crimson created.");
     }
 
@@ -500,6 +523,36 @@ impl CrimsonApp {
         }
     }
 
+    fn cpu_gpu_page(&self, ui: &mut egui::Ui) {
+        ui.heading("Hardware compatibility");
+        let cpu = self
+            .system
+            .cpus()
+            .first()
+            .map(|processor| processor.brand().trim())
+            .filter(|brand| !brand.is_empty())
+            .unwrap_or("CPU information unavailable");
+        ui.label(format!("Detected CPU: {cpu}"));
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("Resizable BAR (ReBAR)").strong().color(CRIMSON));
+            ui.label("ReBAR is a PCIe firmware and hardware capability, not a Windows registry tweak.");
+            ui.label("It requires a compatible CPU/platform, motherboard firmware, and supported graphics device. The BIOS normally needs UEFI boot, Above 4G Decoding, and Re-Size BAR enabled.");
+            ui.label("Crimson will not force-enable ReBAR or write undocumented firmware settings. Unsupported hardware cannot gain ReBAR through software.");
+            ui.label("Status: Not verified by this app. Check the motherboard/laptop manufacturer specifications and BIOS. If the firmware has no Re-Size BAR option, treat the device as unsupported.");
+        });
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("XMP / EXPO").strong().color(CRIMSON));
+            ui.label("Memory profiles are configured in BIOS/UEFI and depend on the memory controller, motherboard and RAM. Crimson does not change memory timings or voltage.");
+        });
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("CPU parking and power plans").strong().color(CRIMSON));
+            ui.label("Windows already manages core scheduling and parking dynamically. Forcing every core online can increase heat and power use without improving frame times. Crimson does not apply blanket un-parking or overclocking.");
+        });
+    }
+
     fn network_page(&self, ui: &mut egui::Ui) {
         ui.heading("Windows network protection");
         ui.label(
@@ -600,6 +653,7 @@ impl eframe::App for CrimsonApp {
                 Page::Scanner => self.scanner_page(ui),
                 Page::Gaming => self.gaming_page(ui),
                 Page::Windows => self.windows_tweaks_page(ui),
+                Page::CpuGpu => self.cpu_gpu_page(ui),
                 Page::Network => self.network_page(ui),
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
