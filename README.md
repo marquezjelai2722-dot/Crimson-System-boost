@@ -37,6 +37,11 @@ This isn't some magical one-click FPS booster yet. It's an early desktop scaffol
 # What's actually implemented:
 
 - Rust + egui/eframe desktop dashboard with Night Ops styling.
+- OneClick Optimizer profile for disabling Xbox Game Bar background recording, enabling Windows Game Mode, and disabling transparency effects.
+- Platinum+ Optimizer profile, which includes the OneClick profile plus Windows visual-effects performance mode.
+- WinUtil-inspired Windows Tweaks page with individual selections, batch apply, status reporting, and undo of the latest Crimson batch.
+- Tweaks are restricted to four allow-listed per-user registry settings. Crimson does not disable Defender, Firewall, Windows Update, drivers, or Windows services, and does not remove installed apps.
+- Before each batch, Crimson requests UAC approval to create a Windows System Restore point, saves the original values, verifies each write, and attempts automatic rollback if a write fails. If Windows cannot confirm the restore point, the batch is cancelled.
 - CPU and memory readings through "sysinfo", refreshed once per second rather than on every UI frame.
 - SHA-256 runtime integrity check of the running executable, checked once per minute against a baseline captured at launch.
 - Full-screen red/black lockout warning when the running executable changes after launch; this is detection only, not automatic repair.
@@ -45,7 +50,7 @@ This isn't some magical one-click FPS booster yet. It's an early desktop scaffol
 - Creates "%USERPROFILE%\Videos\Crimson Clips\Clips" and "Exports" on first launch when a user profile path is available.
 - Crimson Clips? Not implemented yet. No actual recording.
 - Crimson Desktop? Also not implemented. No taskbar modifications.
-- The other optimization pages? Mostly placeholders. They don't modify Windows settings.
+- Startup, Services, Optional Apps, Cleaner, and several other navigation pages remain planned modules. They are not presented as working features yet.
 
 Yes, there's still a lot to do. I know.
 
@@ -102,7 +107,7 @@ The stuff I actually want to finish, assuming Windows, Rust, and my remaining br
 
 1. System monitoring and hardware/OS compatibility detection.
 2. Restore-point creation and settings snapshots that are actually verified.
-3. Reversible optimizations with proper audit logs.
+3. Expand the allow-listed reversible optimization catalog and add persistent audit logs.
 4. Crimson Clips — recording integration, tray support, visible recording status, and configurable replay length.
 5. Crimson Desktop — Windows 10/11 taskbar customization with restoration support.
 6. Installer — automatic folder creation without deleting someone's recordings during uninstall.
