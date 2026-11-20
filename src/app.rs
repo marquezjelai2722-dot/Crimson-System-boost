@@ -1,3 +1,4 @@
+#[path = "security.rs"]
 mod security;
 
 use eframe::egui;
@@ -77,7 +78,7 @@ impl Default for CrimsonApp {
         let integrity_status = if integrity_baseline.is_some() {
             "Baseline captured. Runtime checks run every 60 seconds.".to_owned()
         } else {
-            "Could not capture the executable integrity baseline.".to_owned()
+            "Integrity cannot be verified: executable path or baseline is unavailable. Crimson is locked.".to_owned()
         };
         let (scan_tx, scan_rx) = mpsc::channel();
 
@@ -89,8 +90,10 @@ impl Default for CrimsonApp {
             executable,
             integrity_baseline,
             integrity_status,
-            integrity_tampered: false,
-            last_integrity_check: Instant::now(),
+            // Fail closed if the executable cannot be fingerprinted at startup.
+            integrity_tampered: integrity_baseline.is_none(),
+            // Run the first verification on the first UI update, not after a 60-second delay.
+            last_integrity_check: Instant::now() - INTEGRITY_INTERVAL,
             last_metrics_refresh: Instant::now() - METRICS_INTERVAL,
             scan_tx,
             scan_rx,
@@ -122,8 +125,9 @@ impl CrimsonApp {
         let (Some(executable), Some(expected)) =
             (self.executable.as_deref(), self.integrity_baseline)
         else {
+            self.integrity_tampered = true;
             self.integrity_status =
-                "Integrity monitoring unavailable: executable baseline is missing.".to_owned();
+                "Integrity cannot be verified: executable baseline is missing. Crimson is locked.".to_owned();
             return;
         };
 
@@ -138,7 +142,10 @@ impl CrimsonApp {
                     "WARNING: executable bytes changed after launch. Sensitive actions are locked.".to_owned();
             }
             Err(error) => {
-                self.integrity_status = format!("Could not verify executable: {error}");
+                self.integrity_tampered = true;
+                self.integrity_status = format!(
+                    "Integrity verification failed: {error}. Crimson is locked."
+                );
             }
         }
     }
@@ -339,7 +346,7 @@ impl eframe::App for CrimsonApp {
                         ui.add_space(12.0);
                         ui.heading(egui::RichText::new("CRIMSON INTEGRITY FAILURE").strong().color(egui::Color32::from_rgb(220, 35, 48)));
                         ui.add_space(12.0);
-                        ui.label(egui::RichText::new("The running executable no longer matches its launch-time fingerprint.").color(egui::Color32::WHITE));
+                        ui.label(egui::RichText::new(&self.integrity_status).color(egui::Color32::WHITE));
                         ui.label(egui::RichText::new("Crimson has locked its controls. No Windows settings, firewall rules, or other applications were changed.").color(MUTED));
                         ui.add_space(18.0);
                         ui.label(egui::RichText::new("Close Crimson and reinstall from a trusted, verified release.").strong().color(egui::Color32::WHITE));
