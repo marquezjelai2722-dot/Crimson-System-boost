@@ -351,6 +351,13 @@ mod windows {
                 Some(value) => write_dword(target, value)?,
                 None => delete_value(target)?,
             }
+            let actual = read_original(target)?;
+            if actual != value {
+                return Err(format!(
+                    "Rollback verification failed for HKCU\\{}\\{}.",
+                    target.key, target.name
+                ));
+            }
         }
         Ok(())
     }
@@ -386,14 +393,23 @@ mod windows {
         let mut changed = 0usize;
         for id in ids {
             for target in targets(*id) {
-                if let Err(error) = write_dword(*target, target.desired) {
+                let apply_result = write_dword(*target, target.desired).and_then(|()| {
+                    match read_original(*target)? {
+                        Some(actual) if actual == target.desired => Ok(()),
+                        actual => Err(format!(
+                            "Verification failed for HKCU\\{}\\{} (expected {}, found {:?}).",
+                            target.key, target.name, target.desired, actual
+                        )),
+                    }
+                });
+                if let Err(error) = apply_result {
                     let rollback = fs::read_to_string(&path)
                         .map_err(|read_error| format!("{error}; backup read failed: {read_error}"))
                         .and_then(|saved| restore_snapshot(&saved));
                     return match rollback {
-                        Ok(()) => Err(format!("{error}. Previous values were restored.")),
+                        Ok(()) => Err(format!("{error} Previous values were restored.")),
                         Err(rollback_error) => Err(format!(
-                            "{error}. Automatic rollback also failed: {rollback_error}. Backup: {}",
+                            "{error} Automatic rollback also failed: {rollback_error}. Backup: {}",
                             path.display()
                         )),
                     };
