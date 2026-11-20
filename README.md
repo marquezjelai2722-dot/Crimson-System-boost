@@ -38,9 +38,13 @@ This isn't some magical one-click FPS booster yet. It's an early desktop scaffol
 
 - Rust + egui/eframe desktop dashboard with Night Ops styling.
 - OneClick Optimizer profile for disabling Xbox Game Bar background recording, enabling Windows Game Mode, and disabling transparency effects.
+- Platinum+ adds Windows visual-effects performance mode.
+- Windows Tweaks includes reversible current-user controls for consumer-experience suggestions, Start menu app suggestions, and Windows tips.
+- CPU & GPU page explains ReBAR and XMP/EXPO hardware/firmware requirements. It does not pretend a Windows app can enable BIOS-only features or force unsupported hardware to support them.
 - Platinum+ Optimizer profile, which includes the OneClick profile plus Windows visual-effects performance mode.
 - WinUtil-inspired Windows Tweaks page with individual selections, batch apply, status reporting, and undo of the latest Crimson batch.
-- Tweaks are restricted to four allow-listed per-user registry settings. Crimson does not disable Defender, Firewall, Windows Update, drivers, or Windows services, and does not remove installed apps.
+- Tweaks are restricted to seven allow-listed per-user registry settings. Crimson does not disable Defender, Firewall, Windows Update, drivers, or Windows services, and does not remove installed apps.
+- These are independent implementations inspired by publicly documented optimizer workflows; Crimson does not copy Hellzerg Optimizer source code. Hellzerg's project is GPL-3.0 and its published feature list includes performance, privacy, startup, cleanup, DNS, and system tools. Only the subset explicitly listed above is implemented here.
 - Before each batch, Crimson requests UAC approval to create a Windows System Restore point, saves the original values, verifies each write, and attempts automatic rollback if a write fails. If Windows cannot confirm the restore point, the batch is cancelled.
 - CPU and memory readings through "sysinfo", refreshed once per second rather than on every UI frame.
 - SHA-256 runtime integrity check of the running executable, checked once per minute against a baseline captured at launch.
