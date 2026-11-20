@@ -209,7 +209,6 @@ impl CrimsonApp {
         }
     }
 
-
     fn spawn_optimization(
         &mut self,
         task: impl FnOnce() -> Result<String, String> + Send + 'static,
@@ -259,15 +258,27 @@ impl CrimsonApp {
         ui.add_space(12.0);
 
         ui.group(|ui| {
-            ui.label(egui::RichText::new("OneClick Optimizer").strong().color(CRIMSON));
+            ui.label(
+                egui::RichText::new("OneClick Optimizer")
+                    .strong()
+                    .color(CRIMSON),
+            );
             ui.label("Balanced gaming profile:");
             ui.label("• Disable Xbox Game Bar background recording and automatic captures.");
             ui.label("• Enable Windows Game Mode.");
             ui.label("• Disable Windows transparency effects.");
             ui.add_space(6.0);
-            ui.label(egui::RichText::new("Platinum+ Optimizer").strong().color(CRIMSON));
-            ui.label("Includes the OneClick profile, plus Windows visual-effects performance mode.");
-            ui.label("This can reduce visual polish. It does not guarantee a specific FPS increase.");
+            ui.label(
+                egui::RichText::new("Platinum+ Optimizer")
+                    .strong()
+                    .color(CRIMSON),
+            );
+            ui.label(
+                "Includes the OneClick profile, plus Windows visual-effects performance mode.",
+            );
+            ui.label(
+                "This can reduce visual polish. It does not guarantee a specific FPS increase.",
+            );
         });
 
         let enabled = !self.optimization_running;
@@ -313,7 +324,11 @@ impl CrimsonApp {
         });
         ui.add_space(8.0);
         ui.group(|ui| {
-            ui.label(egui::RichText::new("Appearance and responsiveness").strong().color(CRIMSON));
+            ui.label(
+                egui::RichText::new("Appearance and responsiveness")
+                    .strong()
+                    .color(CRIMSON),
+            );
             ui.checkbox(
                 &mut self.selected_tweaks[2],
                 tweaks::TweakId::TransparencyOff.label(),
