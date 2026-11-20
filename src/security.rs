@@ -122,8 +122,8 @@ mod tests {
 
     #[test]
     fn sha256_matches_known_vector() {
-        let path = std::env::temp_dir()
-            .join(format!("crimson-sha256-test-{}.tmp", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("crimson-sha256-test-{}.tmp", std::process::id()));
         fs::write(&path, b"abc").expect("write test file");
 
         let actual = sha256_file(&path).expect("hash test file");
