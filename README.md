@@ -37,8 +37,12 @@ This isn't some magical one-click FPS booster yet. It's an early desktop scaffol
 # What's actually implemented:
 
 - Rust + egui/eframe desktop dashboard with Night Ops styling.
-- Live CPU and memory readings through "sysinfo".
-- Creates "%USERPROFILE%\Videos\Crimson Clips\Clips" and "Exports" on first launch.
+- CPU and memory readings through "sysinfo", refreshed once per second rather than on every UI frame.
+- SHA-256 runtime integrity check of the running executable, checked once per minute against a baseline captured at launch.
+- Full-screen red/black lockout warning when the running executable changes after launch; this is detection only, not automatic repair.
+- Optional Microsoft Defender custom scan of the running executable through Microsoft's MpCmdRun utility.
+- No Windows Defender Firewall rules or profiles are changed, and the app does not open inbound network ports.
+- Creates "%USERPROFILE%\Videos\Crimson Clips\Clips" and "Exports" on first launch when a user profile path is available.
 - Crimson Clips? Not implemented yet. No actual recording.
 - Crimson Desktop? Also not implemented. No taskbar modifications.
 - The other optimization pages? Mostly placeholders. They don't modify Windows settings.
@@ -51,7 +55,7 @@ I'm not spending all this time building an optimizer just for it to destroy some
 
 So here's the deal:
 
-- Windows Defender, Windows Firewall, Windows Update, drivers, Microsoft Store dependencies, and essential services are protected.
+- Windows Defender, Windows Firewall, Windows Update, drivers, Microsoft Store dependencies, and essential services are protected. The current build does not modify firewall rules or profiles.
 - Every future tweak must check compatibility, create and verify a Windows restore point, save the original setting, log the change, and provide a tested undo option.
 - If a restore point can't be created and verified, the associated change gets cancelled. No shortcuts.
 - Built-in app removal must be optional and explain what it removes and any compatibility risks.

@@ -3,11 +3,11 @@ name: Rust CI
 on:
   push:
     branches:
-      - rust-rebuild/night-ops
+      - main
+      - "security/**"
   pull_request:
     branches:
       - main
-      - rust-rebuild/night-ops
 
 permissions:
   contents: read
@@ -20,8 +20,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Format Rust sources
-        run: cargo fmt --all
       - name: Verify formatting
         run: cargo fmt --all -- --check
       - name: Compile

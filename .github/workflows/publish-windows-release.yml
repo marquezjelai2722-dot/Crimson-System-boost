@@ -2,10 +2,8 @@ name: Publish Windows Release
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/publish-windows-release.yml"
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -21,25 +19,22 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify formatting
+        run: cargo fmt --all -- --check
+
       - name: Build optimized Windows executable
         run: cargo build --release --bin crimson-system-boost
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0-windows
-          name: Crimson System Boost v0.1.0 — Windows
-          target_commitish: main
+          tag_name: ${{ github.ref_name }}
+          name: Crimson System Boost ${{ github.ref_name }} — Windows
           body: |
-            ## Crimson System Boost v0.1.0 — Windows
+            Windows x64 build of Crimson System Boost.
 
-            Initial Windows x64 build of the Rust desktop application.
-
-            **Current scope:** system monitoring and desktop UI scaffold. Gaming optimization controls and other planned modules are not yet implemented.
-
-            **Platform:** Windows x64
-            **Build:** Optimized Rust release
+            This is an early monitoring and security-integration scaffold. It does not modify Windows Firewall rules or apply system optimizations.
           files: target/release/crimson-system-boost.exe
           draft: false
           prerelease: true
-          make_latest: true
+          make_latest: false
