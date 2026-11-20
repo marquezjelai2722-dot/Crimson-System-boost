@@ -1,5 +1,7 @@
 #[path = "security.rs"]
 mod security;
+#[path = "tweaks.rs"]
+mod tweaks;
 
 use eframe::egui;
 use std::{
@@ -70,6 +72,11 @@ pub struct CrimsonApp {
     scan_rx: Receiver<String>,
     scan_running: bool,
     scan_status: String,
+    optimization_tx: Sender<String>,
+    optimization_rx: Receiver<String>,
+    optimization_running: bool,
+    optimization_status: String,
+    selected_tweaks: [bool; 4],
 }
 
 impl Default for CrimsonApp {
@@ -101,6 +108,7 @@ impl Default for CrimsonApp {
             "Integrity cannot be verified: executable path or baseline is unavailable. Crimson is locked.".to_owned()
         };
         let (scan_tx, scan_rx) = mpsc::channel();
+        let (optimization_tx, optimization_rx) = mpsc::channel();
 
         Self {
             page: Page::Dashboard,
@@ -119,6 +127,11 @@ impl Default for CrimsonApp {
             scan_rx,
             scan_running: false,
             scan_status: "No Defender scan has been requested.".to_owned(),
+            optimization_tx,
+            optimization_rx,
+            optimization_running: false,
+            optimization_status: "No optimization has been applied in this session.".to_owned(),
+            selected_tweaks: [true, true, true, false],
         }
     }
 }
@@ -194,6 +207,147 @@ impl CrimsonApp {
             self.scan_running = false;
             self.scan_status = result;
         }
+    }
+
+
+    fn spawn_optimization(
+        &mut self,
+        task: impl FnOnce() -> Result<String, String> + Send + 'static,
+    ) {
+        if self.optimization_running {
+            return;
+        }
+        self.optimization_running = true;
+        self.optimization_status = "Preparing a restore point and settings snapshot…".to_owned();
+        let sender = self.optimization_tx.clone();
+        thread::spawn(move || {
+            let status = match task() {
+                Ok(message) => message,
+                Err(error) => format!("Optimization cancelled or failed: {error}"),
+            };
+            let _ = sender.send(status);
+        });
+    }
+
+    fn start_preset(&mut self, preset: tweaks::Preset) {
+        self.spawn_optimization(move || tweaks::apply_preset(preset));
+    }
+
+    fn start_selected_tweaks(&mut self) {
+        let ids: Vec<tweaks::TweakId> = tweaks::TweakId::ALL
+            .into_iter()
+            .zip(self.selected_tweaks)
+            .filter_map(|(id, selected)| selected.then_some(id))
+            .collect();
+        self.spawn_optimization(move || tweaks::apply_selected(&ids));
+    }
+
+    fn undo_latest_optimization(&mut self) {
+        self.spawn_optimization(tweaks::undo_latest);
+    }
+
+    fn collect_optimization_result(&mut self) {
+        if let Ok(result) = self.optimization_rx.try_recv() {
+            self.optimization_running = false;
+            self.optimization_status = result;
+        }
+    }
+
+    fn gaming_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Gaming performance profiles");
+        ui.label("Real Windows settings. No fake FPS counter, timer-resolution forcing, core-parking hacks, or security disabling.");
+        ui.add_space(12.0);
+
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("OneClick Optimizer").strong().color(CRIMSON));
+            ui.label("Balanced gaming profile:");
+            ui.label("• Disable Xbox Game Bar background recording and automatic captures.");
+            ui.label("• Enable Windows Game Mode.");
+            ui.label("• Disable Windows transparency effects.");
+            ui.add_space(6.0);
+            ui.label(egui::RichText::new("Platinum+ Optimizer").strong().color(CRIMSON));
+            ui.label("Includes the OneClick profile, plus Windows visual-effects performance mode.");
+            ui.label("This can reduce visual polish. It does not guarantee a specific FPS increase.");
+        });
+
+        let enabled = !self.optimization_running;
+        let mut apply_one_click = false;
+        let mut apply_platinum = false;
+        ui.add_enabled_ui(enabled, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                apply_one_click = ui.button("Apply OneClick Optimizer").clicked();
+                apply_platinum = ui.button("Apply Platinum+ Optimizer").clicked();
+            });
+        });
+        if apply_one_click {
+            self.start_preset(tweaks::Preset::OneClick);
+        } else if apply_platinum {
+            self.start_preset(tweaks::Preset::PlatinumPlus);
+        }
+
+        ui.add_space(10.0);
+        if self.optimization_running {
+            ui.spinner();
+        }
+        ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
+        ui.label("Applying a profile requests UAC approval to create a Windows System Restore point. If Windows cannot confirm the restore point, Crimson cancels the changes.");
+    }
+
+    fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Windows Utility — Tweaks");
+        ui.label("Select individual changes, apply them as one reviewed batch, and undo the latest Crimson batch.");
+        ui.add_space(10.0);
+
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("Gaming").strong().color(CRIMSON));
+            ui.checkbox(
+                &mut self.selected_tweaks[0],
+                tweaks::TweakId::GameCaptureOff.label(),
+            );
+            ui.label(tweaks::TweakId::GameCaptureOff.description());
+            ui.checkbox(
+                &mut self.selected_tweaks[1],
+                tweaks::TweakId::GameModeOn.label(),
+            );
+            ui.label(tweaks::TweakId::GameModeOn.description());
+        });
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("Appearance and responsiveness").strong().color(CRIMSON));
+            ui.checkbox(
+                &mut self.selected_tweaks[2],
+                tweaks::TweakId::TransparencyOff.label(),
+            );
+            ui.label(tweaks::TweakId::TransparencyOff.description());
+            ui.checkbox(
+                &mut self.selected_tweaks[3],
+                tweaks::TweakId::VisualEffectsPerformance.label(),
+            );
+            ui.label(tweaks::TweakId::VisualEffectsPerformance.description());
+        });
+
+        let enabled = !self.optimization_running;
+        let mut apply = false;
+        let mut undo = false;
+        ui.add_enabled_ui(enabled, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                apply = ui.button("Apply selected tweaks").clicked();
+                undo = ui.button("Undo latest Crimson batch").clicked();
+            });
+        });
+        if apply {
+            self.start_selected_tweaks();
+        } else if undo {
+            self.undo_latest_optimization();
+        }
+
+        ui.add_space(10.0);
+        if self.optimization_running {
+            ui.spinner();
+        }
+        ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
+        ui.label("Each batch is limited to the four listed HKCU DWORD settings. No services, drivers, Defender, Firewall, Windows Update, or installed apps are modified.");
+        ui.label("A restore point and exact original registry values are saved before changes. Undo restores missing values by deleting only the values Crimson created.");
     }
 
     fn sidebar(&mut self, ui: &mut egui::Ui) {
@@ -387,6 +541,7 @@ impl eframe::App for CrimsonApp {
         }
         self.check_integrity();
         self.collect_scan_result();
+        self.collect_optimization_result();
         ctx.request_repaint_after(Duration::from_secs(1));
 
         let mut style = (*ctx.style()).clone();
@@ -428,6 +583,8 @@ impl eframe::App for CrimsonApp {
             egui::ScrollArea::vertical().show(ui, |ui| match self.page {
                 Page::Dashboard => self.dashboard(ui),
                 Page::Scanner => self.scanner_page(ui),
+                Page::Gaming => self.gaming_page(ui),
+                Page::Windows => self.windows_tweaks_page(ui),
                 Page::Network => self.network_page(ui),
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
