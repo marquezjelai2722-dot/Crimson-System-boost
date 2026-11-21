@@ -1,5 +1,5 @@
 //! Read-only Windows diagnostics. These commands inspect state; they never modify it.
-use std::{path::PathBuf, process::{Command, Stdio}, time::{Duration, Instant}};
+use std::{io::Read, path::PathBuf, process::{Command, Stdio}, thread, time::{Duration, Instant}};
 
 fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String> {
     let mut child = Command::new(program)
@@ -8,37 +8,60 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Could not start {program}: {e}"))?;
+    let stdout = child.stdout.take().ok_or("Could not capture command output")?;
+    let stderr = child.stderr.take().ok_or("Could not capture command errors")?;
+    let stdout_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let mut reader = stdout;
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    });
+    let stderr_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let mut reader = stderr;
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    });
     let start = Instant::now();
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(status)) => {
-                let output = child.wait_with_output().map_err(|e| e.to_string())?;
-                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
-                let text = if stdout.is_empty() { stderr } else { stdout };
-                if !status.success() {
-                    return Err(if text.is_empty() {
-                        format!("{program} exited with status {status}")
-                    } else {
-                        text
-                    });
-                }
-                if text.is_empty() {
-                    return Err(format!("{program} returned no diagnostic output"));
-                }
-                return Ok(text);
+            Ok(Some(status)) => break status,
+            Ok(None) if start.elapsed() < timeout => {
+                thread::sleep(Duration::from_millis(100));
             }
-            Ok(None) if start.elapsed() < timeout => std::thread::sleep(Duration::from_millis(100)),
             Ok(None) => {
                 let _ = child.kill();
                 let _ = child.wait();
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
                 return Err(format!("{program} exceeded the diagnostic timeout"));
             }
-            Err(e) => return Err(format!("Could not inspect {program}: {e}")),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(format!("Could not inspect {program}: {error}"));
+            }
         }
+    };
+    let stdout = stdout_reader.join().map_err(|_| "Output reader failed")?;
+    let stderr = stderr_reader.join().map_err(|_| "Error reader failed")?;
+    let stdout = String::from_utf8_lossy(&stdout).trim().to_owned();
+    let stderr = String::from_utf8_lossy(&stderr).trim().to_owned();
+    let text = if stdout.is_empty() { stderr } else { stdout };
+    if !status.success() {
+        return Err(if text.is_empty() {
+            format!("{program} exited with status {status}")
+        } else {
+            text
+        });
     }
+    if text.is_empty() {
+        return Err(format!("{program} returned no diagnostic output"));
+    }
+    Ok(text)
 }
-
 fn bounded(text: String, max_chars: usize) -> String {
     if text.chars().count() <= max_chars {
         text
