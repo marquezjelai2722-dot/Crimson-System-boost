@@ -1,6 +1,6 @@
 #[path = "security.rs"]
-mod security;
 mod diagnostics;
+mod security;
 #[path = "tweaks.rs"]
 mod tweaks;
 
@@ -30,6 +30,7 @@ enum Page {
     Debloat,
     Cleaner,
     Network,
+    Processes,
     Scanner,
     Restore,
     Logs,
@@ -49,6 +50,7 @@ impl Page {
             Self::Debloat => "Optional Apps",
             Self::Cleaner => "Cleaner",
             Self::Network => "Network",
+            Self::Processes => "Processes",
             Self::Scanner => "Scanner",
             Self::Restore => "Restore",
             Self::Logs => "Activity Logs",
@@ -82,6 +84,11 @@ pub struct CrimsonApp {
     network_result: String,
     startup_result: String,
     cleanup_result: String,
+    process_result: String,
+    service_result: String,
+    apps_result: String,
+    graphics_result: String,
+    power_result: String,
 }
 
 impl Default for CrimsonApp {
@@ -141,6 +148,11 @@ impl Default for CrimsonApp {
             network_result: "Run a DNS lookup and four-packet ping test against a hostname.".to_owned(),
             startup_result: "Startup inventory has not been scanned.".to_owned(),
             cleanup_result: "Temporary-file preview has not been run.".to_owned(),
+            process_result: "Process inventory has not been scanned.".to_owned(),
+            service_result: "Service inventory has not been scanned.".to_owned(),
+            apps_result: "Installed-app inventory has not been scanned.".to_owned(),
+            graphics_result: "Graphics adapter inventory has not been scanned.".to_owned(),
+            power_result: "Active power plan has not been checked.".to_owned(),
         }
     }
 }
@@ -434,6 +446,81 @@ impl CrimsonApp {
         ui.label(egui::RichText::new(&self.network_result).monospace());
     }
 
+    fn processes_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Running processes");
+        ui.label("Read-only process inventory from Windows tasklist. Crimson does not terminate processes or change their priority.");
+        if ui.button("Refresh process list").clicked() {
+            self.process_result = diagnostics::process_inventory()
+                .unwrap_or_else(|error| format!("Process inventory failed: {error}"));
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.process_result).monospace());
+    }
+
+    fn services_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Windows services");
+        ui.label("Read-only inventory of Windows services and their current states. No service is stopped, disabled, or set to manual.");
+        if ui.button("Scan Windows services").clicked() {
+            self.service_result = diagnostics::service_inventory()
+                .unwrap_or_else(|error| format!("Service inventory failed: {error}"));
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.service_result).monospace());
+        ui.label("Service optimization is intentionally not automatic: disabling the wrong service can break networking, updates, audio, security, or boot.");
+    }
+
+    fn debloat_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Installed applications");
+        ui.label("Read-only inventory of registered desktop applications. This page does not uninstall apps, remove Store packages, or edit Windows components.");
+        if ui.button("Scan installed applications").clicked() {
+            self.apps_result = diagnostics::installed_apps_inventory()
+                .unwrap_or_else(|error| format!("App inventory failed: {error}"));
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.apps_result).monospace());
+        ui.label("Crimson will not label software as malware based only on its name or publisher. Use Microsoft Defender for security scanning.");
+    }
+
+    fn restore_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Restore and rollback");
+        ui.label("Undo the most recent Crimson optimization batch using its saved original registry values.");
+        ui.add_enabled_ui(!self.optimization_running, |ui| {
+            if ui.button("Undo latest Crimson optimization").clicked() {
+                self.undo_latest_optimization();
+            }
+        });
+        if self.optimization_running {
+            ui.spinner();
+        }
+        ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
+        ui.separator();
+        ui.label("Windows System Restore is separate from Crimson rollback. Open System Protection in Windows to review or restore a Windows restore point.");
+    }
+
+    fn logs_page(&self, ui: &mut egui::Ui) {
+        ui.heading("Activity log");
+        ui.label("Current-session status. This build does not claim to maintain a tamper-proof audit log.");
+        ui.group(|ui| {
+            ui.label("Executable integrity");
+            ui.label(&self.integrity_status);
+            ui.separator();
+            ui.label("Defender scan");
+            ui.label(&self.scan_status);
+            ui.separator();
+            ui.label("Optimization / rollback");
+            ui.label(&self.optimization_status);
+            ui.separator();
+            ui.label("Startup inventory");
+            ui.label(&self.startup_result);
+            ui.separator();
+            ui.label("Temporary-file preview");
+            ui.label(&self.cleanup_result);
+            ui.separator();
+            ui.label("Network diagnostics");
+            ui.label(&self.network_result);
+        });
+    }
+
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
             ui.add_space(12.0);
@@ -452,6 +539,7 @@ impl CrimsonApp {
                 (Page::Debloat, "Optional Apps"),
                 (Page::Cleaner, "Cleaner"),
                 (Page::Network, "Network"),
+                (Page::Processes, "Processes"),
                 (Page::Scanner, "Scanner"),
                 (Page::Restore, "Restore"),
                 (Page::Logs, "Activity Logs"),
@@ -569,7 +657,7 @@ impl CrimsonApp {
         }
     }
 
-    fn cpu_gpu_page(&self, ui: &mut egui::Ui) {
+    fn cpu_gpu_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("Hardware compatibility");
         let cpu = self
             .system
@@ -586,6 +674,25 @@ impl CrimsonApp {
             ui.label("It requires a compatible CPU/platform, motherboard firmware, and supported graphics device. The BIOS normally needs UEFI boot, Above 4G Decoding, and Re-Size BAR enabled.");
             ui.label("Crimson will not force-enable ReBAR or write undocumented firmware settings. Unsupported hardware cannot gain ReBAR through software.");
             ui.label("Status: Not verified by this app. Check the motherboard/laptop manufacturer specifications and BIOS. If the firmware has no Re-Size BAR option, treat the device as unsupported.");
+        });
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("Detected graphics adapter and driver").strong().color(CRIMSON));
+            if ui.button("Inspect graphics adapter").clicked() {
+                self.graphics_result = diagnostics::graphics_inventory()
+                    .unwrap_or_else(|error| format!("Graphics inspection failed: {error}"));
+            }
+            ui.label(egui::RichText::new(&self.graphics_result).monospace());
+        });
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.label(egui::RichText::new("Active Windows power plan").strong().color(CRIMSON));
+            if ui.button("Check active power plan").clicked() {
+                self.power_result = diagnostics::power_plan()
+                    .unwrap_or_else(|error| format!("Power-plan check failed: {error}"));
+            }
+            ui.label(egui::RichText::new(&self.power_result).monospace());
+            ui.label("Crimson reports the plan only. It does not force High Performance or disable thermal and power management.");
         });
         ui.add_space(8.0);
         ui.group(|ui| {
@@ -703,11 +810,16 @@ impl eframe::App for CrimsonApp {
                 Page::Startup => self.startup_page(ui),
                 Page::Cleaner => self.cleaner_page(ui),
                 Page::Network => self.network_diagnostics_page(ui),
+                Page::Processes => self.processes_page(ui),
+                Page::Services => self.services_page(ui),
+                Page::Debloat => self.debloat_page(ui),
+                Page::Restore => self.restore_page(ui),
+                Page::Logs => self.logs_page(ui),
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
                 page => {
                     ui.label(format!(
-                        "{} module is planned but not implemented yet.",
+                        "{} module is not active in this build.",
                         page.label()
                     ));
                     ui.label("No system settings have been changed.");
