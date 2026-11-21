@@ -446,6 +446,9 @@ impl CrimsonApp {
         });
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.network_result).monospace());
+        ui.add_space(16.0);
+        ui.separator();
+        self.network_page(ui);
     }
 
     fn processes_page(&mut self, ui: &mut egui::Ui) {
