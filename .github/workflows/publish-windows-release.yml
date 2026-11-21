@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag to create/publish (for example v1.0.0)"
+        description: "Release tag to create/publish (for example v1.1.0)"
         required: true
-        default: "v1.0.0"
+        default: "v1.1.0"
         type: string
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $tag = "${{ inputs.release_tag }}".Trim()
           } elseif ("${{ github.ref_type }}" -eq "branch" -and "${{ github.ref_name }}" -eq "main") {
-            $tag = "v1.0.0"
+            $tag = "v1.1.0"
           } else {
             $tag = "${{ github.ref_name }}".Trim()
           }
@@ -81,11 +81,25 @@ jobs:
           target_commitish: main
           name: Crimson System Boost ${{ steps.release_meta.outputs.tag }} — Windows
           body: |
-            Windows x64 installer for Crimson System Boost.
+            Crimson System Boost ${{ steps.release_meta.outputs.tag }} — Windows x64 prerelease.
 
-            Install location: per-user Programs folder. The installer creates Start Menu shortcuts and includes an uninstaller.
+            ## Included
+            - OneClick and Platinum+ optimization profiles.
+            - Seven allow-listed per-user Windows registry tweaks with saved original values and an undo path.
+            - CPU and RAM monitoring with a bottom status bar.
+            - Read-only startup, process, service, installed-app, graphics-driver, and power-plan inventories.
+            - Temporary-folder cleanup preview and bounded DNS/ping diagnostics.
+            - Runtime executable integrity checking and optional Microsoft Defender scanning.
 
-            This is an early monitoring and security-integration build. Several optimization pages are placeholders; it does not currently apply Windows optimizations or modify Windows Firewall rules.
+            ## Important limitations
+            - No guaranteed FPS increase is claimed.
+            - The status bar does not yet report game FPS or GPU telemetry.
+            - Cleanup, startup changes, service control, app removal, and process controls are not implemented.
+            - Graphics scaling, frame generation, game recording, and desktop customization are not implemented.
+            - Optimization changes are limited to the documented allow-listed per-user registry settings. Defender, Firewall, Windows Update, drivers, and essential services are not disabled.
+
+            ## Installer
+            Per-user installation under LocalAppData with Start Menu shortcuts and an uninstaller. Runtime installation and uninstall still need testing on physical Windows systems.
           files: |
             installer/Output/Crimson-System-Boost-Setup-v${{ steps.release_meta.outputs.version }}.exe
             target/release/crimson-system-boost.exe
