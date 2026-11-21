@@ -37,8 +37,8 @@ This isn't a magical one-click FPS booster. It applies a small allow-listed set 
 # What's actually implemented:
 
 - Rust + egui/eframe desktop dashboard with Night Ops styling.
-- OneClick Optimizer and Platinum+ profiles with seven allow-listed, reversible per-user registry settings.
-- Windows Tweaks page with individual selections, batch apply, original-value snapshots, restore-point request, write verification, rollback on failure, and undo of the latest Crimson batch.
+- A categorized tweak library with individually selectable, reversible per-user registry settings.
+- Tweak library with separate Gaming, Performance, and Privacy columns; each tweak appears once and can be selected independently. Batch apply uses original-value snapshots, restore-point request, write verification, rollback on failure, and undo of the latest Crimson batch.
 - Live CPU and memory readings through sysinfo.
 - Fixed bottom performance status bar with live CPU and RAM readings; game FPS and GPU telemetry are explicitly marked unavailable until a real capture/telemetry backend is connected.
 - SHA-256 runtime integrity check and lockout warning; this is runtime tamper detection, not proof of download authenticity or automatic repair.
