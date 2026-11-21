@@ -284,18 +284,46 @@ impl CrimsonApp {
         ui.columns(3, |columns| {
             columns[0].vertical(|ui| {
                 tweak_category_header(ui, "GAMING", "Game capture and Windows game scheduling");
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameCaptureOff);
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::GameCaptureOff,
+                );
                 tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameModeOn);
             });
             columns[1].vertical(|ui| {
-                tweak_category_header(ui, "PERFORMANCE", "Windows visual effects and responsiveness");
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::TransparencyOff);
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::VisualEffectsPerformance);
+                tweak_category_header(
+                    ui,
+                    "PERFORMANCE",
+                    "Windows visual effects and responsiveness",
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::TransparencyOff,
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::VisualEffectsPerformance,
+                );
             });
             columns[2].vertical(|ui| {
-                tweak_category_header(ui, "PRIVACY", "Optional suggestions and notification content");
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableAppSuggestions);
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableWindowsTips);
+                tweak_category_header(
+                    ui,
+                    "PRIVACY",
+                    "Optional suggestions and notification content",
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::DisableAppSuggestions,
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::DisableWindowsTips,
+                );
             });
         });
         ui.add_space(12.0);
@@ -304,12 +332,21 @@ impl CrimsonApp {
             let mut apply = false;
             let mut clear = false;
             ui.add_enabled_ui(!self.optimization_running, |ui| {
-                apply = ui.button(egui::RichText::new("Apply selected tweaks").strong()).clicked();
+                apply = ui
+                    .button(egui::RichText::new("Apply selected tweaks").strong())
+                    .clicked();
                 clear = ui.button("Clear selection").clicked();
             });
-            if apply { self.start_selected_tweaks(); }
-            if clear { self.selected_tweaks = [false; 7]; }
-            if self.optimization_running { ui.spinner(); ui.label("Applying and verifying selected settings…"); }
+            if apply {
+                self.start_selected_tweaks();
+            }
+            if clear {
+                self.selected_tweaks = [false; 7];
+            }
+            if self.optimization_running {
+                ui.spinner();
+                ui.label("Applying and verifying selected settings…");
+            }
         });
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
@@ -663,7 +700,12 @@ impl CrimsonApp {
 fn tweak_category_header(ui: &mut egui::Ui, title: &str, subtitle: &str) {
     ui.group(|ui| {
         ui.set_min_height(72.0);
-        ui.label(egui::RichText::new(title).strong().color(CRIMSON).size(15.0));
+        ui.label(
+            egui::RichText::new(title)
+                .strong()
+                .color(CRIMSON)
+                .size(15.0),
+        );
         ui.label(egui::RichText::new(subtitle).small().color(MUTED));
     });
     ui.add_space(8.0);
@@ -672,7 +714,10 @@ fn tweak_category_header(ui: &mut egui::Ui, title: &str, subtitle: &str) {
 fn tweak_card(ui: &mut egui::Ui, selected: &mut [bool; 7], id: tweaks::TweakId) {
     ui.group(|ui| {
         ui.set_min_height(116.0);
-        ui.checkbox(&mut selected[id.index()], egui::RichText::new(id.label()).strong());
+        ui.checkbox(
+            &mut selected[id.index()],
+            egui::RichText::new(id.label()).strong(),
+        );
         ui.add_space(4.0);
         ui.label(egui::RichText::new(id.description()).small().color(MUTED));
     });
