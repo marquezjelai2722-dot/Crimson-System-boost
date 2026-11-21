@@ -30,9 +30,9 @@ Contact: MarquezJelai2722@gmail.com
 
 # Current status
 
-Early development. Not publicly tested. Expect unfinished features.
+Early development. Expect unfinished features. This branch is still undergoing Windows CI and runtime verification.
 
-This isn't some magical one-click FPS booster yet. It's an early desktop scaffold, and I'd rather be honest about that than pretend everything works.
+This isn't a magical one-click FPS booster. It applies a small allow-listed set of Windows settings and provides diagnostics; it does not promise a fixed FPS gain.
 
 # What's actually implemented:
 
@@ -41,10 +41,9 @@ This isn't some magical one-click FPS booster yet. It's an early desktop scaffol
 - Platinum+ adds Windows visual-effects performance mode.
 - Windows Tweaks includes reversible current-user controls for consumer-experience suggestions, Start menu app suggestions, and Windows tips.
 - CPU & GPU page explains ReBAR and XMP/EXPO hardware/firmware requirements. It does not pretend a Windows app can enable BIOS-only features or force unsupported hardware to support them.
-- Platinum+ Optimizer profile, which includes the OneClick profile plus Windows visual-effects performance mode.
 - WinUtil-inspired Windows Tweaks page with individual selections, batch apply, status reporting, and undo of the latest Crimson batch.
 - Tweaks are restricted to seven allow-listed per-user registry settings. Crimson does not disable Defender, Firewall, Windows Update, drivers, or Windows services, and does not remove installed apps.
-- These are independent implementations inspired by publicly documented optimizer workflows; Crimson does not copy Hellzerg Optimizer source code. Hellzerg's project is GPL-3.0 and its published feature list includes performance, privacy, startup, cleanup, DNS, and system tools. Only the subset explicitly listed above is implemented here.
+- These are independent implementations inspired by publicly documented optimizer workflows; Crimson does not copy third-party source code.
 - Before each batch, Crimson requests UAC approval to create a Windows System Restore point, saves the original values, verifies each write, and attempts automatic rollback if a write fails. If Windows cannot confirm the restore point, the batch is cancelled.
 - CPU and memory readings through "sysinfo", refreshed once per second rather than on every UI frame.
 - SHA-256 runtime integrity check of the running executable, checked once per minute against a baseline captured at launch.
@@ -111,10 +110,13 @@ The stuff I actually want to finish, assuming Windows, Rust, and my remaining br
 
 1. System monitoring and hardware/OS compatibility detection.
 2. Restore-point creation and settings snapshots that are actually verified.
-3. Expand the allow-listed reversible optimization catalog and add persistent audit logs.
-4. Crimson Clips — recording integration, tray support, visible recording status, and configurable replay length.
-5. Crimson Desktop — Windows 10/11 taskbar customization with restoration support.
-6. Installer — automatic folder creation without deleting someone's recordings during uninstall.
+3. Add verified, opt-in startup controls with backups and restoration.
+4. Add preview-first cleanup with explicit confirmation and conservative file eligibility rules.
+5. Add safe per-game profiles and measurable before/after frame-time diagnostics.
+6. Evaluate a dedicated graphics capture/scaling backend before promising Lossless Scaling-style features.
+7. Add persistent, integrity-protected audit logs.
+8. Crimson Clips — recording integration, tray support, visible recording status, and configurable replay length.
+9. Crimson Desktop — Windows 10/11 taskbar customization with restoration support.
 
 No imaginary features marked as completed. No pretending a placeholder is a working feature.
 
