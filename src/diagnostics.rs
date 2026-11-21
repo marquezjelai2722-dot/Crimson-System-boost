@@ -1,5 +1,11 @@
 //! Read-only Windows diagnostics. These commands inspect state; they never modify it.
-use std::{io::Read, path::PathBuf, process::{Command, Stdio}, thread, time::{Duration, Instant}};
+use std::{
+    io::Read,
+    path::PathBuf,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
 
 fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String> {
     let mut child = Command::new(program)
@@ -8,8 +14,14 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Could not start {program}: {e}"))?;
-    let stdout = child.stdout.take().ok_or("Could not capture command output")?;
-    let stderr = child.stderr.take().ok_or("Could not capture command errors")?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or("Could not capture command output")?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or("Could not capture command errors")?;
     let stdout_reader = thread::spawn(move || {
         let mut bytes = Vec::new();
         let mut reader = stdout;
@@ -108,8 +120,8 @@ pub fn cleanup_preview() -> Result<String, String> {
         .ok_or("Temporary directory is unavailable")?;
     let mut count = 0u64;
     let mut bytes = 0u64;
-    let entries = std::fs::read_dir(&temp)
-        .map_err(|e| format!("Cannot inspect {}: {e}", temp.display()))?;
+    let entries =
+        std::fs::read_dir(&temp).map_err(|e| format!("Cannot inspect {}: {e}", temp.display()))?;
     for entry in entries.flatten() {
         let path = entry.path();
         if let Ok(meta) = std::fs::symlink_metadata(&path) {
@@ -155,7 +167,12 @@ pub fn network_test(host: &str) -> Result<String, String> {
 /// Lists running processes using Windows tasklist. No process is stopped.
 #[cfg(windows)]
 pub fn process_inventory() -> Result<String, String> {
-    run("tasklist.exe", &["/FO", "TABLE", "/NH"], Duration::from_secs(6)).map(bounded_output)
+    run(
+        "tasklist.exe",
+        &["/FO", "TABLE", "/NH"],
+        Duration::from_secs(6),
+    )
+    .map(bounded_output)
 }
 
 #[cfg(not(windows))]
@@ -199,7 +216,11 @@ pub fn installed_apps_inventory() -> Result<String, String> {
 /// Reports the active Windows power plan. It does not switch plans or alter power settings.
 #[cfg(windows)]
 pub fn power_plan() -> Result<String, String> {
-    run("powercfg.exe", &["/getactivescheme"], Duration::from_secs(5))
+    run(
+        "powercfg.exe",
+        &["/getactivescheme"],
+        Duration::from_secs(5),
+    )
 }
 
 #[cfg(not(windows))]
