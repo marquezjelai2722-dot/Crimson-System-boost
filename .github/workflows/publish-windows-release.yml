@@ -12,7 +12,7 @@ on:
       release_tag:
         description: "Release tag to create/publish (for example v1.1.0)"
         required: true
-        default: "v1.1.0"
+        default: "v1.1.5"
         type: string
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $tag = "${{ inputs.release_tag }}".Trim()
           } elseif ("${{ github.ref_type }}" -eq "branch" -and "${{ github.ref_name }}" -eq "main") {
-            $tag = "v1.1.0"
+            $tag = "v1.1.5"
           } else {
             $tag = "${{ github.ref_name }}".Trim()
           }
@@ -84,8 +84,9 @@ jobs:
             Crimson System Boost ${{ steps.release_meta.outputs.tag }} — Windows x64 prerelease.
 
             ## Included
-            - OneClick and Platinum+ optimization profiles.
-            - Seven allow-listed per-user Windows registry tweaks with saved original values and an undo path.
+            - Individually selectable Windows tweaks organized into Gaming, Performance, and Privacy categories.
+            - Each tweak appears once; users select the exact settings to apply rather than choosing a bulk optimizer preset.
+            - Reversible per-user registry changes with saved original values, verification, rollback on failure, and an undo path.
             - CPU and RAM monitoring with a bottom status bar.
             - Read-only startup, process, service, installed-app, graphics-driver, and power-plan inventories.
             - Temporary-folder cleanup preview and bounded DNS/ping diagnostics.
