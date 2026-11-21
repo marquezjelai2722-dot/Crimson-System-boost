@@ -30,22 +30,33 @@ Contact: MarquezJelai2722@gmail.com
 
 # Current status
 
-Early development. Not publicly tested. Expect unfinished features.
+Early development. Expect unfinished features. This branch is still undergoing Windows CI and runtime verification.
 
-This isn't some magical one-click FPS booster yet. It's an early desktop scaffold, and I'd rather be honest about that than pretend everything works.
+This isn't a magical one-click FPS booster. It applies a small allow-listed set of Windows settings and provides diagnostics; it does not promise a fixed FPS gain.
 
 # What's actually implemented:
 
 - Rust + egui/eframe desktop dashboard with Night Ops styling.
-- CPU and memory readings through "sysinfo", refreshed once per second rather than on every UI frame.
-- SHA-256 runtime integrity check of the running executable, checked once per minute against a baseline captured at launch.
-- Full-screen red/black lockout warning when the running executable changes after launch; this is detection only, not automatic repair.
-- Optional Microsoft Defender custom scan of the running executable through Microsoft's MpCmdRun utility.
-- No Windows Defender Firewall rules or profiles are changed, and the app does not open inbound network ports.
-- Creates "%USERPROFILE%\Videos\Crimson Clips\Clips" and "Exports" on first launch when a user profile path is available.
-- Crimson Clips? Not implemented yet. No actual recording.
-- Crimson Desktop? Also not implemented. No taskbar modifications.
-- The other optimization pages? Mostly placeholders. They don't modify Windows settings.
+- OneClick Optimizer and Platinum+ profiles with seven allow-listed, reversible per-user registry settings.
+- Windows Tweaks page with individual selections, batch apply, original-value snapshots, restore-point request, write verification, rollback on failure, and undo of the latest Crimson batch.
+- Live CPU and memory readings through sysinfo.
+- Fixed bottom performance status bar with live CPU and RAM readings; game FPS and GPU telemetry are explicitly marked unavailable until a real capture/telemetry backend is connected.
+- SHA-256 runtime integrity check and lockout warning; this is runtime tamper detection, not proof of download authenticity or automatic repair.
+- Optional Microsoft Defender custom scan of the running Crimson executable.
+- Read-only startup inventory for common Run and RunOnce registry locations.
+- Read-only process and Windows service inventories; no process termination, priority changes, or service control.
+- Read-only inventory of registered desktop applications; no app removal or Store package debloating.
+- Temporary-folder size preview; no file deletion.
+- Bounded DNS and four-packet ping diagnostics; no DNS, adapter, or Firewall settings are changed.
+- Graphics adapter/driver and active Windows power-plan inspection; no overclocking, core-unparking, or power-plan forcing.
+- Restore page can undo the latest Crimson registry-tweak batch. Activity page shows current-session status, not a tamper-proof persistent audit log.
+- ReBAR and XMP/EXPO are hardware/firmware features. Crimson does not fake-enable unsupported capabilities.
+- No Defender, Firewall, Windows Update, drivers, or essential Windows services are disabled.
+- Creates "%USERPROFILE%\\Videos\\Crimson Clips\\Clips" and "Exports" on first launch when a user profile path is available.
+- Crimson Clips has no recording backend yet. Crimson Desktop does not modify the taskbar or wallpaper.
+- Lossless Scaling-style graphics scaling and frame generation are not implemented; they require a separate graphics capture/rendering backend.
+
+The diagnostics pages inspect state only. Startup controls, destructive cleanup, service changes, app removal, process controls, and persistent audit logging remain future work until they have safe rollback and compatibility checks.
 
 Yes, there's still a lot to do. I know.
 
@@ -102,10 +113,13 @@ The stuff I actually want to finish, assuming Windows, Rust, and my remaining br
 
 1. System monitoring and hardware/OS compatibility detection.
 2. Restore-point creation and settings snapshots that are actually verified.
-3. Reversible optimizations with proper audit logs.
-4. Crimson Clips — recording integration, tray support, visible recording status, and configurable replay length.
-5. Crimson Desktop — Windows 10/11 taskbar customization with restoration support.
-6. Installer — automatic folder creation without deleting someone's recordings during uninstall.
+3. Add verified, opt-in startup controls with backups and restoration.
+4. Add preview-first cleanup with explicit confirmation and conservative file eligibility rules.
+5. Add safe per-game profiles and measurable before/after frame-time diagnostics.
+6. Evaluate a dedicated graphics capture/scaling backend before promising Lossless Scaling-style features.
+7. Add persistent, integrity-protected audit logs.
+8. Crimson Clips — recording integration, tray support, visible recording status, and configurable replay length.
+9. Crimson Desktop — Windows 10/11 taskbar customization with restoration support.
 
 No imaginary features marked as completed. No pretending a placeholder is a working feature.
 
