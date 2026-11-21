@@ -1,5 +1,5 @@
-#[path = "security.rs"]
 mod diagnostics;
+#[path = "security.rs"]
 mod security;
 #[path = "tweaks.rs"]
 mod tweaks;
