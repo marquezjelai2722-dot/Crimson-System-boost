@@ -23,7 +23,6 @@ const METRICS_INTERVAL: Duration = Duration::from_secs(1);
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
     Dashboard,
-    Gaming,
     CpuGpu,
     Windows,
     Startup,
@@ -43,7 +42,6 @@ impl Page {
     fn label(self) -> &'static str {
         match self {
             Self::Dashboard => "Dashboard",
-            Self::Gaming => "Gaming Boost",
             Self::CpuGpu => "CPU & GPU",
             Self::Windows => "Windows Tweaks",
             Self::Startup => "Startup",
@@ -144,7 +142,7 @@ impl Default for CrimsonApp {
             optimization_rx,
             optimization_running: false,
             optimization_status: "No optimization has been applied in this session.".to_owned(),
-            selected_tweaks: [true, true, true, false, false, false, false],
+            selected_tweaks: [false; 7],
             network_host: "example.com".to_owned(),
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
                 .to_owned(),
@@ -251,10 +249,6 @@ impl CrimsonApp {
         });
     }
 
-    fn start_preset(&mut self, preset: tweaks::Preset) {
-        self.spawn_optimization(move || tweaks::apply_preset(preset));
-    }
-
     fn start_selected_tweaks(&mut self) {
         let ids: Vec<tweaks::TweakId> = tweaks::TweakId::ALL
             .into_iter()
@@ -275,140 +269,51 @@ impl CrimsonApp {
         }
     }
 
-    fn gaming_page(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Gaming performance profiles");
-        ui.label("Real Windows settings. No fake FPS counter, timer-resolution forcing, core-parking hacks, or security disabling.");
-        ui.add_space(12.0);
-
-        ui.group(|ui| {
-            ui.label(
-                egui::RichText::new("OneClick Optimizer")
-                    .strong()
-                    .color(CRIMSON),
-            );
-            ui.label("Balanced gaming profile:");
-            ui.label("• Disable Xbox Game Bar background recording and automatic captures.");
-            ui.label("• Enable Windows Game Mode.");
-            ui.label("• Disable Windows transparency effects.");
-            ui.add_space(6.0);
-            ui.label(
-                egui::RichText::new("Platinum+ Optimizer")
-                    .strong()
-                    .color(CRIMSON),
-            );
-            ui.label(
-                "Includes the OneClick profile, plus Windows visual-effects performance mode.",
-            );
-            ui.label(
-                "This can reduce visual polish. It does not guarantee a specific FPS increase.",
-            );
-        });
-
-        let enabled = !self.optimization_running;
-        let mut apply_one_click = false;
-        let mut apply_platinum = false;
-        ui.add_enabled_ui(enabled, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                apply_one_click = ui.button("Apply OneClick Optimizer").clicked();
-                apply_platinum = ui.button("Apply Platinum+ Optimizer").clicked();
-            });
-        });
-        if apply_one_click {
-            self.start_preset(tweaks::Preset::OneClick);
-        } else if apply_platinum {
-            self.start_preset(tweaks::Preset::PlatinumPlus);
-        }
-
-        ui.add_space(10.0);
-        if self.optimization_running {
-            ui.spinner();
-        }
-        ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
-        ui.label("Applying a profile requests UAC approval to create a Windows System Restore point. If Windows cannot confirm the restore point, Crimson cancels the changes.");
-    }
-
     fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Windows Utility — Tweaks");
-        ui.label("Select individual changes, apply them as one reviewed batch, and undo the latest Crimson batch.");
-        ui.add_space(10.0);
-
-        ui.group(|ui| {
-            ui.label(egui::RichText::new("Gaming").strong().color(CRIMSON));
-            ui.checkbox(
-                &mut self.selected_tweaks[0],
-                tweaks::TweakId::GameCaptureOff.label(),
-            );
-            ui.label(tweaks::TweakId::GameCaptureOff.description());
-            ui.checkbox(
-                &mut self.selected_tweaks[1],
-                tweaks::TweakId::GameModeOn.label(),
-            );
-            ui.label(tweaks::TweakId::GameModeOn.description());
-        });
-        ui.add_space(8.0);
-        ui.group(|ui| {
-            ui.label(
-                egui::RichText::new("Appearance and responsiveness")
-                    .strong()
-                    .color(CRIMSON),
-            );
-            ui.checkbox(
-                &mut self.selected_tweaks[2],
-                tweaks::TweakId::TransparencyOff.label(),
-            );
-            ui.label(tweaks::TweakId::TransparencyOff.description());
-            ui.checkbox(
-                &mut self.selected_tweaks[3],
-                tweaks::TweakId::VisualEffectsPerformance.label(),
-            );
-            ui.label(tweaks::TweakId::VisualEffectsPerformance.description());
-        });
-        ui.add_space(8.0);
-        ui.group(|ui| {
-            ui.label(
-                egui::RichText::new("Privacy and distractions")
-                    .strong()
-                    .color(CRIMSON),
-            );
-            ui.checkbox(
-                &mut self.selected_tweaks[4],
-                tweaks::TweakId::DisableConsumerFeatures.label(),
-            );
-            ui.label(tweaks::TweakId::DisableConsumerFeatures.description());
-            ui.checkbox(
-                &mut self.selected_tweaks[5],
-                tweaks::TweakId::DisableAppSuggestions.label(),
-            );
-            ui.label(tweaks::TweakId::DisableAppSuggestions.description());
-            ui.checkbox(
-                &mut self.selected_tweaks[6],
-                tweaks::TweakId::DisableWindowsTips.label(),
-            );
-            ui.label(tweaks::TweakId::DisableWindowsTips.description());
-        });
-
-        let enabled = !self.optimization_running;
-        let mut apply = false;
-        let mut undo = false;
-        ui.add_enabled_ui(enabled, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                apply = ui.button("Apply selected tweaks").clicked();
-                undo = ui.button("Undo latest Crimson batch").clicked();
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.heading("Tweak library");
+                ui.label(egui::RichText::new("Choose exactly which Windows settings to change. Every setting appears once.").color(MUTED));
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let count = self.selected_tweaks.iter().filter(|selected| **selected).count();
+                ui.label(egui::RichText::new(format!("{count} selected")).strong().color(CRIMSON));
             });
         });
-        if apply {
-            self.start_selected_tweaks();
-        } else if undo {
-            self.undo_latest_optimization();
-        }
-
-        ui.add_space(10.0);
-        if self.optimization_running {
-            ui.spinner();
-        }
+        ui.add_space(14.0);
+        ui.columns(3, |columns| {
+            columns[0].vertical(|ui| {
+                tweak_category_header(ui, "GAMING", "Game capture and Windows game scheduling");
+                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameCaptureOff);
+                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameModeOn);
+            });
+            columns[1].vertical(|ui| {
+                tweak_category_header(ui, "PERFORMANCE", "Windows visual effects and responsiveness");
+                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::TransparencyOff);
+                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::VisualEffectsPerformance);
+            });
+            columns[2].vertical(|ui| {
+                tweak_category_header(ui, "PRIVACY", "Optional suggestions and notification content");
+                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableAppSuggestions);
+                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableWindowsTips);
+            });
+        });
+        ui.add_space(12.0);
+        ui.separator();
+        ui.horizontal_wrapped(|ui| {
+            let mut apply = false;
+            let mut clear = false;
+            ui.add_enabled_ui(!self.optimization_running, |ui| {
+                apply = ui.button(egui::RichText::new("Apply selected tweaks").strong()).clicked();
+                clear = ui.button("Clear selection").clicked();
+            });
+            if apply { self.start_selected_tweaks(); }
+            if clear { self.selected_tweaks = [false; 7]; }
+            if self.optimization_running { ui.spinner(); ui.label("Applying and verifying selected settings…"); }
+        });
+        ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
-        ui.label("Each batch is limited to seven allow-listed HKCU DWORD settings. No services, drivers, Defender, Firewall, Windows Update, or installed apps are modified.");
-        ui.label("A restore point and exact original registry values are saved before changes. Undo restores missing values by deleting only the values Crimson created.");
+        ui.label("Before changes, Crimson requests a Windows restore point and saves the exact original registry values. If verification fails, it attempts rollback. No Defender, Firewall, Windows Update, services, drivers, or installed apps are changed.");
     }
 
     fn startup_page(&mut self, ui: &mut egui::Ui) {
@@ -536,9 +441,8 @@ impl CrimsonApp {
             ui.add_space(16.0);
             let sections: &[(Page, &str)] = &[
                 (Page::Dashboard, "CORE"),
-                (Page::Gaming, "Gaming Boost"),
                 (Page::CpuGpu, "CPU & GPU"),
-                (Page::Windows, "Windows Tweaks"),
+                (Page::Windows, "Tweaks"),
                 (Page::Startup, "Startup"),
                 (Page::Services, "Services"),
                 (Page::Debloat, "Optional Apps"),
@@ -619,11 +523,11 @@ impl CrimsonApp {
         ui.add_space(20.0);
         ui.group(|ui| {
             ui.label(egui::RichText::new("Safety policy").strong().color(CRIMSON));
-            ui.label("Crimson includes reversible registry profiles plus read-only startup, cleanup and network diagnostics. Destructive cleanup and service changes remain disabled until individually verified.");
+            ui.label("Crimson includes individually selectable reversible tweaks plus read-only startup, cleanup and network diagnostics. Destructive cleanup and service changes remain disabled until individually verified.");
             ui.label("Microsoft Defender and Windows Firewall are never disabled or reconfigured by this build.");
         });
         ui.add_space(12.0);
-        ui.label("Available now: OneClick and Platinum+ registry profiles, individual reversible tweaks, startup inventory, temporary-file preview, and DNS/ping diagnostics.");
+        ui.label("Available now: individually selectable, reversible Windows tweaks, startup inventory, temporary-file preview, and DNS/ping diagnostics.");
     }
 
     fn scanner_page(&mut self, ui: &mut egui::Ui) {
@@ -756,6 +660,25 @@ impl CrimsonApp {
     }
 }
 
+fn tweak_category_header(ui: &mut egui::Ui, title: &str, subtitle: &str) {
+    ui.group(|ui| {
+        ui.set_min_height(72.0);
+        ui.label(egui::RichText::new(title).strong().color(CRIMSON).size(15.0));
+        ui.label(egui::RichText::new(subtitle).small().color(MUTED));
+    });
+    ui.add_space(8.0);
+}
+
+fn tweak_card(ui: &mut egui::Ui, selected: &mut [bool; 7], id: tweaks::TweakId) {
+    ui.group(|ui| {
+        ui.set_min_height(116.0);
+        ui.checkbox(&mut selected[id.index()], egui::RichText::new(id.label()).strong());
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new(id.description()).small().color(MUTED));
+    });
+    ui.add_space(8.0);
+}
+
 fn metric(ui: &mut egui::Ui, title: &str, value: String) {
     ui.group(|ui| {
         ui.set_min_width(190.0);
@@ -842,7 +765,6 @@ impl eframe::App for CrimsonApp {
             egui::ScrollArea::vertical().show(ui, |ui| match self.page {
                 Page::Dashboard => self.dashboard(ui),
                 Page::Scanner => self.scanner_page(ui),
-                Page::Gaming => self.gaming_page(ui),
                 Page::Windows => self.windows_tweaks_page(ui),
                 Page::CpuGpu => self.cpu_gpu_page(ui),
                 Page::Startup => self.startup_page(ui),
