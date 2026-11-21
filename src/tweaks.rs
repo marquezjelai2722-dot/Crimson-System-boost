@@ -76,7 +76,7 @@ impl TweakId {
 
 #[cfg(windows)]
 mod windows {
-    use super::TweakId
+    use super::TweakId;
     use std::{
         fs, io,
         path::{Path, PathBuf},
