@@ -145,7 +145,8 @@ impl Default for CrimsonApp {
             optimization_status: "No optimization has been applied in this session.".to_owned(),
             selected_tweaks: [true, true, true, false, false, false, false],
             network_host: "example.com".to_owned(),
-            network_result: "Run a DNS lookup and four-packet ping test against a hostname.".to_owned(),
+            network_result: "Run a DNS lookup and four-packet ping test against a hostname."
+                .to_owned(),
             startup_result: "Startup inventory has not been scanned.".to_owned(),
             cleanup_result: "Temporary-file preview has not been run.".to_owned(),
             process_result: "Process inventory has not been scanned.".to_owned(),
@@ -677,7 +678,11 @@ impl CrimsonApp {
         });
         ui.add_space(8.0);
         ui.group(|ui| {
-            ui.label(egui::RichText::new("Detected graphics adapter and driver").strong().color(CRIMSON));
+            ui.label(
+                egui::RichText::new("Detected graphics adapter and driver")
+                    .strong()
+                    .color(CRIMSON),
+            );
             if ui.button("Inspect graphics adapter").clicked() {
                 self.graphics_result = diagnostics::graphics_inventory()
                     .unwrap_or_else(|error| format!("Graphics inspection failed: {error}"));
