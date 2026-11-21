@@ -1,3 +1,4 @@
+#[path = "diagnostics.rs"]
 mod diagnostics;
 #[path = "security.rs"]
 mod security;
@@ -802,6 +803,35 @@ impl eframe::App for CrimsonApp {
             .resizable(false)
             .exact_width(205.0)
             .show(ctx, |ui| self.sidebar(ui));
+        egui::TopBottomPanel::bottom("performance_status_bar")
+            .resizable(false)
+            .show(ctx, |ui| {
+                let cpus = self.system.cpus();
+                let cpu = if cpus.is_empty() {
+                    0.0
+                } else {
+                    cpus.iter().map(|core| core.cpu_usage()).sum::<f32>() / cpus.len() as f32
+                };
+                let total_memory = self.system.total_memory();
+                let used_memory = self.system.used_memory();
+                let memory_percent = if total_memory > 0 {
+                    used_memory as f32 / total_memory as f32 * 100.0
+                } else {
+                    0.0
+                };
+                ui.horizontal_wrapped(|ui| {
+                    ui.colored_label(CRIMSON, "CRIMSON LIVE");
+                    ui.separator();
+                    ui.label(format!("CPU {cpu:.0}%"));
+                    ui.separator();
+                    ui.label(format!("RAM {memory_percent:.0}%"));
+                    ui.separator();
+                    ui.label("GPU — telemetry unavailable");
+                    ui.separator();
+                    ui.label("GAME FPS — no frame-capture source connected");
+                });
+            });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
             ui.heading(self.page.label());
@@ -822,13 +852,6 @@ impl eframe::App for CrimsonApp {
                 Page::Logs => self.logs_page(ui),
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
-                page => {
-                    ui.label(format!(
-                        "{} module is not active in this build.",
-                        page.label()
-                    ));
-                    ui.label("No system settings have been changed.");
-                }
             });
         });
     }
