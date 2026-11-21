@@ -2,12 +2,6 @@
 //! No shell text or registry paths are accepted from the UI.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Preset {
-    OneClick,
-    PlatinumPlus,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TweakId {
     GameCaptureOff,
     GameModeOn,
@@ -28,6 +22,18 @@ impl TweakId {
         Self::DisableAppSuggestions,
         Self::DisableWindowsTips,
     ];
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::GameCaptureOff => 0,
+            Self::GameModeOn => 1,
+            Self::TransparencyOff => 2,
+            Self::VisualEffectsPerformance => 3,
+            Self::DisableConsumerFeatures => 4,
+            Self::DisableAppSuggestions => 5,
+            Self::DisableWindowsTips => 6,
+        }
+    }
 
     pub fn label(self) -> &'static str {
         match self {
@@ -70,7 +76,7 @@ impl TweakId {
 
 #[cfg(windows)]
 mod windows {
-    use super::{Preset, TweakId};
+    use super::TweakId;
     use std::{
         fs, io,
         path::{Path, PathBuf},
@@ -399,21 +405,6 @@ mod windows {
         Ok(())
     }
 
-    fn selected_for_preset(preset: Preset) -> Vec<TweakId> {
-        match preset {
-            Preset::OneClick => vec![
-                TweakId::GameCaptureOff,
-                TweakId::GameModeOn,
-                TweakId::TransparencyOff,
-            ],
-            Preset::PlatinumPlus => TweakId::ALL.to_vec(),
-        }
-    }
-
-    pub fn apply_preset(preset: Preset) -> Result<String, String> {
-        apply_selected(&selected_for_preset(preset))
-    }
-
     pub fn apply_selected(ids: &[TweakId]) -> Result<String, String> {
         if ids.is_empty() {
             return Err("Select at least one tweak before applying.".to_owned());
@@ -513,12 +504,7 @@ mod windows {
 }
 
 #[cfg(windows)]
-pub use windows::{apply_preset, apply_selected, undo_latest};
-
-#[cfg(not(windows))]
-pub fn apply_preset(_preset: Preset) -> Result<String, String> {
-    Err("Windows optimization is available only on Windows 10 and Windows 11.".to_owned())
-}
+pub use windows::{apply_selected, undo_latest};
 
 #[cfg(not(windows))]
 pub fn apply_selected(_ids: &[TweakId]) -> Result<String, String> {
