@@ -378,7 +378,10 @@ impl CrimsonApp {
             self.update_running = false;
             match result {
                 Ok(Some(path)) => {
-                    self.update_status = format!("Installer downloaded and SHA-256 verified: {}", path.display());
+                    self.update_status = format!(
+                        "Installer downloaded and SHA-256 verified: {}",
+                        path.display()
+                    );
                     self.update_installer = Some(path);
                 }
                 Ok(None) => self.update_status = "No update available.".to_owned(),
@@ -405,11 +408,16 @@ impl CrimsonApp {
         if self.update_installer.is_some() {
             ui.checkbox(&mut self.confirm_install_update, "I verified that I want to run the downloaded Crimson installer and update this app.");
             ui.add_enabled_ui(self.confirm_install_update, |ui| {
-                if ui.button("Run verified installer and close Crimson").clicked() {
+                if ui
+                    .button("Run verified installer and close Crimson")
+                    .clicked()
+                {
                     if let Some(path) = self.update_installer.as_ref() {
                         match std::process::Command::new(path).spawn() {
                             Ok(_) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
-                            Err(error) => self.update_status = format!("Could not launch installer: {error}"),
+                            Err(error) => {
+                                self.update_status = format!("Could not launch installer: {error}")
+                            }
                         }
                     }
                 }
@@ -585,20 +593,36 @@ impl CrimsonApp {
             if ui.button("Scan TEMP folder").clicked() {
                 self.scan_cleanup();
             }
-            ui.label(egui::RichText::new(format!("{} candidates", self.cleanup_candidates.len())).strong().color(CRIMSON));
+            ui.label(
+                egui::RichText::new(format!("{} candidates", self.cleanup_candidates.len()))
+                    .strong()
+                    .color(CRIMSON),
+            );
         });
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.cleanup_result).color(MUTED));
-        egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-            for (index, path) in self.cleanup_candidates.iter().enumerate() {
-                let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("[non-Unicode filename]");
-                ui.checkbox(&mut self.cleanup_selected[index], name);
-            }
-        });
-        let selected_count = self.cleanup_selected.iter().filter(|selected| **selected).count();
+        egui::ScrollArea::vertical()
+            .max_height(300.0)
+            .show(ui, |ui| {
+                for (index, path) in self.cleanup_candidates.iter().enumerate() {
+                    let name = path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("[non-Unicode filename]");
+                    ui.checkbox(&mut self.cleanup_selected[index], name);
+                }
+            });
+        let selected_count = self
+            .cleanup_selected
+            .iter()
+            .filter(|selected| **selected)
+            .count();
         ui.separator();
         ui.label(format!("{selected_count} files selected. Files are rechecked immediately before deletion; locked or changed files are skipped."));
-        ui.checkbox(&mut self.confirm_cleanup_delete, "I reviewed the selected filenames and want to delete these TEMP files.");
+        ui.checkbox(
+            &mut self.confirm_cleanup_delete,
+            "I reviewed the selected filenames and want to delete these TEMP files.",
+        );
         ui.add_enabled_ui(self.confirm_cleanup_delete && selected_count > 0, |ui| {
             if ui.button("Delete selected old TEMP files").clicked() {
                 self.delete_selected_cleanup();
@@ -623,7 +647,9 @@ impl CrimsonApp {
     }
 
     fn delete_selected_cleanup(&mut self) {
-        let selected: Vec<PathBuf> = self.cleanup_candidates.iter()
+        let selected: Vec<PathBuf> = self
+            .cleanup_candidates
+            .iter()
             .zip(self.cleanup_selected.iter())
             .filter_map(|(path, selected)| selected.then_some(path.clone()))
             .collect();
@@ -631,9 +657,13 @@ impl CrimsonApp {
             self.cleanup_result = "No files selected. Nothing was deleted.".to_owned();
             return;
         }
-        self.cleanup_result = diagnostics::delete_cleanup_candidates(&selected)
+        let report = diagnostics::delete_cleanup_candidates(&selected)
             .unwrap_or_else(|error| format!("Cleanup failed: {error}"));
         self.scan_cleanup();
+        self.cleanup_result = format!(
+            "{report}\n{} eligible files remain in TEMP.",
+            self.cleanup_candidates.len()
+        );
     }
 
     fn network_diagnostics_page(&mut self, ui: &mut egui::Ui) {
@@ -737,17 +767,32 @@ impl CrimsonApp {
                 ui.label(egui::RichText::new("SYSTEM BOOST").small().color(MUTED));
             });
             ui.add_space(16.0);
-            ui.label(egui::RichText::new("WORKSPACE").small().strong().color(MUTED));
+            ui.label(
+                egui::RichText::new("WORKSPACE")
+                    .small()
+                    .strong()
+                    .color(MUTED),
+            );
             nav_item(ui, &mut self.page, Page::Dashboard, "Overview");
             nav_item(ui, &mut self.page, Page::CpuGpu, "Hardware");
             ui.add_space(8.0);
-            ui.label(egui::RichText::new("OPTIMIZATION").small().strong().color(MUTED));
+            ui.label(
+                egui::RichText::new("OPTIMIZATION")
+                    .small()
+                    .strong()
+                    .color(MUTED),
+            );
             nav_item(ui, &mut self.page, Page::Windows, "Windows tweaks");
             nav_item(ui, &mut self.page, Page::Cleaner, "Temp cleaner");
             nav_item(ui, &mut self.page, Page::Startup, "Startup apps");
             nav_item(ui, &mut self.page, Page::Debloat, "Installed apps");
             ui.add_space(8.0);
-            ui.label(egui::RichText::new("DIAGNOSTICS").small().strong().color(MUTED));
+            ui.label(
+                egui::RichText::new("DIAGNOSTICS")
+                    .small()
+                    .strong()
+                    .color(MUTED),
+            );
             nav_item(ui, &mut self.page, Page::Drivers, "Driver updates");
             nav_item(ui, &mut self.page, Page::Health, "System health");
             nav_item(ui, &mut self.page, Page::Updates, "App updates");
@@ -764,7 +809,11 @@ impl CrimsonApp {
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
                 ui.separator();
                 ui.label(egui::RichText::new("WINDOWS • LOCAL").small().color(MUTED));
-                ui.label(egui::RichText::new(format!("CRIMSON  /  {}", env!("CARGO_PKG_VERSION"))).strong().color(CRIMSON));
+                ui.label(
+                    egui::RichText::new(format!("CRIMSON  /  {}", env!("CARGO_PKG_VERSION")))
+                        .strong()
+                        .color(CRIMSON),
+                );
             });
         });
     }
@@ -950,7 +999,9 @@ impl CrimsonApp {
 fn nav_item(ui: &mut egui::Ui, current: &mut Page, page: Page, label: &str) {
     let selected = *current == page;
     let text = if selected {
-        egui::RichText::new(format!("  {label}")).strong().color(egui::Color32::WHITE)
+        egui::RichText::new(format!("  {label}"))
+            .strong()
+            .color(egui::Color32::WHITE)
     } else {
         egui::RichText::new(format!("  {label}")).color(MUTED)
     };
