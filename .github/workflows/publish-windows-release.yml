@@ -12,7 +12,7 @@ on:
       release_tag:
         description: "Release tag to create/publish (for example v1.1.0)"
         required: true
-        default: "v1.1.5"
+        default: "v1.2.0"
         type: string
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $tag = "${{ inputs.release_tag }}".Trim()
           } elseif ("${{ github.ref_type }}" -eq "branch" -and "${{ github.ref_name }}" -eq "main") {
-            $tag = "v1.1.5"
+            $tag = "v1.2.0"
           } else {
             $tag = "${{ github.ref_name }}".Trim()
           }
@@ -74,6 +74,19 @@ jobs:
             throw "Installer output is missing: $setup"
           }
 
+      - name: Generate SHA-256 manifest
+        shell: pwsh
+        run: |
+          $files = @(
+            "installer/Output/Crimson-System-Boost-Setup-v${{ steps.release_meta.outputs.version }}.exe",
+            "target/release/crimson-system-boost.exe"
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $file)"
+          }
+          $lines | Set-Content -LiteralPath "SHA256SUMS.txt" -Encoding ascii
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -89,13 +102,13 @@ jobs:
             - Reversible per-user registry changes with saved original values, verification, rollback on failure, and an undo path.
             - CPU and RAM monitoring with a bottom status bar.
             - Read-only startup, process, service, installed-app, graphics-driver, and power-plan inventories.
-            - Temporary-folder cleanup preview and bounded DNS/ping diagnostics.
+            - Seven-day-old direct-child TEMP scan with per-file review, explicit deletion confirmation, and path/age revalidation.\n            - Bounded DNS/ping diagnostics, Windows component health scans, and explicitly confirmed DISM/SFC repair.\n            - Driver inventory and a user-controlled Windows Update handoff.\n            - On-demand updater that verifies the downloaded installer against the release SHA-256 manifest before asking for install approval.
             - Runtime executable integrity checking and optional Microsoft Defender scanning.
 
             ## Important limitations
             - No guaranteed FPS increase is claimed.
             - The status bar does not yet report game FPS or GPU telemetry.
-            - Cleanup, startup changes, service control, app removal, and process controls are not implemented.
+            - Driver availability is determined by Windows Update or the device maker; Crimson does not scrape or force-install third-party driver packages.\n            - Startup changes, service control, app removal, process controls, recording, and desktop customization are not implemented.
             - Graphics scaling, frame generation, game recording, and desktop customization are not implemented.
             - Optimization changes are limited to the documented allow-listed per-user registry settings. Defender, Firewall, Windows Update, drivers, and essential services are not disabled.
 
