@@ -355,7 +355,10 @@ impl CrimsonApp {
         ui.separator();
         ui.label(egui::RichText::new("Repair Windows components").strong());
         ui.label("This launches an elevated command window for DISM RestoreHealth and SFC /scannow. It changes Windows system files and may take a long time; approve the separate UAC prompt only if you want to proceed.");
-        ui.checkbox(&mut self.confirm_system_repair, "I have saved my work and want to request the repair.");
+        ui.checkbox(
+            &mut self.confirm_system_repair,
+            "I have saved my work and want to request the repair.",
+        );
         ui.add_enabled_ui(self.confirm_system_repair && !self.health_running, |ui| {
             if ui.button("Request administrator repair").clicked() {
                 self.health_result = diagnostics::launch_system_repair()
