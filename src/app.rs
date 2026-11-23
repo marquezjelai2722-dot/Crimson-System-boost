@@ -92,6 +92,7 @@ pub struct CrimsonApp {
     graphics_result: String,
     power_result: String,
     driver_result: String,
+    driver_update_status: String,
     driver_tx: Sender<String>,
     driver_rx: Receiver<String>,
     driver_running: bool,
@@ -167,6 +168,7 @@ impl Default for CrimsonApp {
             graphics_result: "Graphics adapter inventory has not been scanned.".to_owned(),
             power_result: "Active power plan has not been checked.".to_owned(),
             driver_result: "Driver inventory has not been scanned.".to_owned(),
+            driver_update_status: "No driver update page opened.".to_owned(),
             driver_tx,
             driver_rx,
             driver_running: false,
@@ -367,6 +369,11 @@ impl CrimsonApp {
         ui.separator();
         ui.label("Safe update path: Windows Update → Advanced options → Optional updates → Driver updates, or the Samsung / Intel support page for the exact device model.");
         ui.label("Crimson does not bulk-download or force-install drivers. Incorrect drivers can disable Wi-Fi, graphics, audio, or startup.");
+        if ui.button("Open Windows optional driver updates").clicked() {
+            self.driver_update_status = diagnostics::open_optional_driver_updates()
+                .unwrap_or_else(|error| format!("Could not open driver updates: {error}"));
+        }
+        ui.label(egui::RichText::new(&self.driver_update_status).color(MUTED));
     }
 
     fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
