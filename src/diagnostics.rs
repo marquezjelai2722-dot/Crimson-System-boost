@@ -463,20 +463,42 @@ pub fn download_verified_update(_current_version: &str) -> Result<Option<PathBuf
     Err("The Crimson self-updater is supported on Windows only.".into())
 }
 
-/// Runs non-repairing Windows image and protected-file checks.
-/// DISM ScanHealth and SFC verifyonly inspect; they do not repair or replace files.
+/// Runs non-repairing Windows image and protected-file checks with explicit UAC elevation.
 #[cfg(windows)]
 pub fn system_health_scan() -> Result<String, String> {
-    let dism = run(
-        "DISM.exe",
-        &["/Online", "/Cleanup-Image", "/ScanHealth"],
-        Duration::from_secs(240),
-    )?;
-    let sfc = run("sfc.exe", &["/verifyonly"], Duration::from_secs(240))?;
-    Ok(format!(
-        "DISM component-store scan:\n{dism}\n\nSystem File Checker verification:\n{sfc}\n\nScan only: no repairs or file replacements were performed. If corruption is reported, review the result before choosing a repair."
-    ))
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$scriptPath = Join-Path $env:TEMP ('CrimsonHealth-' + [guid]::NewGuid().ToString('N') + '.ps1')
+$logPath = Join-Path $env:TEMP ('CrimsonHealth-' + [guid]::NewGuid().ToString('N') + '.log')
+$child = @'
+param([string]$LogPath)
+$ErrorActionPreference = 'Continue'
+& DISM.exe /Online /Cleanup-Image /ScanHealth *>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+$dismCode = $LASTEXITCODE
+if ($dismCode -ne 0) { exit $dismCode }
+& sfc.exe /verifyonly *>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+exit $LASTEXITCODE
+'@
+Set-Content -LiteralPath $scriptPath -Value $child -Encoding utf8
+try {
+    $arguments = '-NoProfile -File "' + $scriptPath + '" -LogPath "' + $logPath + '"'
+    $process = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru
+    if (Test-Path -LiteralPath $logPath) {
+        Get-Content -LiteralPath $logPath -Raw
+    }
+    if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+} finally {
+    Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
 }
+"#;
+    run(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        Duration::from_secs(600),
+    )
+}
+
 
 #[cfg(not(windows))]
 pub fn system_health_scan() -> Result<String, String> {
