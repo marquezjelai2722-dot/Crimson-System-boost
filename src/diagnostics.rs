@@ -244,6 +244,49 @@ pub fn graphics_inventory() -> Result<String, String> {
     Err("Graphics inventory is currently supported on Windows only.".into())
 }
 
+
+/// Lists signed Plug-and-Play drivers with version and date metadata.
+/// This is inventory only: it never downloads or installs a driver.
+#[cfg(windows)]
+pub fn driver_inventory() -> Result<String, String> {
+    let script = "$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_PnPSignedDriver | Where-Object { $_.DeviceName } | Sort-Object DeviceName | Select-Object DeviceName, Manufacturer, DriverVersion, DriverDate, InfName | Format-Table -AutoSize | Out-String -Width 220";
+    run(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        Duration::from_secs(25),
+    )
+    .map(bounded_output)
+}
+
+#[cfg(not(windows))]
+pub fn driver_inventory() -> Result<String, String> {
+    Err("Driver inventory is currently supported on Windows only.".into())
+}
+
+/// Runs non-repairing Windows image and protected-file checks.
+/// DISM ScanHealth and SFC verifyonly inspect; they do not repair or replace files.
+#[cfg(windows)]
+pub fn system_health_scan() -> Result<String, String> {
+    let dism = run(
+        "DISM.exe",
+        &["/Online", "/Cleanup-Image", "/ScanHealth"],
+        Duration::from_secs(240),
+    )?;
+    let sfc = run(
+        "sfc.exe",
+        &["/verifyonly"],
+        Duration::from_secs(240),
+    )?;
+    Ok(format!(
+        "DISM component-store scan:\n{dism}\n\nSystem File Checker verification:\n{sfc}\n\nScan only: no repairs or file replacements were performed. If corruption is reported, review the result before choosing a repair."
+    ))
+}
+
+#[cfg(not(windows))]
+pub fn system_health_scan() -> Result<String, String> {
+    Err("Windows component health scans are supported on Windows only.".into())
+}
+
 fn bounded_output(text: String) -> String {
     bounded(text, 12_000)
 }
