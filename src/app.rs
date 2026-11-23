@@ -336,6 +336,20 @@ impl CrimsonApp {
         }
     }
 
+    fn start_windows_update_driver_scan(&mut self) {
+        if self.driver_running {
+            return;
+        }
+        self.driver_running = true;
+        self.driver_result = "Searching the configured Windows Update service for applicable drivers…".to_owned();
+        let sender = self.driver_tx.clone();
+        thread::spawn(move || {
+            let result = diagnostics::windows_update_driver_inventory()
+                .unwrap_or_else(|error| format!("Windows Update driver search failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
     fn start_health_scan(&mut self) {
         if self.health_running {
             return;
@@ -474,6 +488,12 @@ impl CrimsonApp {
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.driver_result).monospace());
         ui.separator();
+        ui.label("Check Microsoft's configured Windows Update service for applicable driver updates. This search is read-only; it does not download or install anything.");
+        ui.add_enabled_ui(!self.driver_running, |ui| {
+            if ui.button("Check Windows Update for driver updates").clicked() {
+                self.start_windows_update_driver_scan();
+            }
+        });
         ui.label("Safe update path: Windows Update → Advanced options → Optional updates → Driver updates, or the Samsung / Intel support page for the exact device model.");
         ui.label("Crimson does not bulk-download or force-install drivers. Incorrect drivers can disable Wi-Fi, graphics, audio, or startup.");
         if ui.button("Open Windows optional driver updates").clicked() {
