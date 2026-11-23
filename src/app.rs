@@ -894,11 +894,27 @@ impl eframe::App for CrimsonApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(egui::RichText::new("CRIMSON SYSTEM BOOST").strong().color(CRIMSON).size(17.0));
-                        ui.label(egui::RichText::new(format!("{}  /  Windows utility", self.page.label())).small().color(MUTED));
+                        ui.label(
+                            egui::RichText::new("CRIMSON SYSTEM BOOST")
+                                .strong()
+                                .color(CRIMSON)
+                                .size(17.0),
+                        );
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{}  /  Windows utility",
+                                self.page.label()
+                            ))
+                            .small()
+                            .color(MUTED),
+                        );
                     });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(egui::RichText::new("LOCAL • REVERSIBLE • NO TELEMETRY").small().color(MUTED));
+                        ui.label(
+                            egui::RichText::new("LOCAL • REVERSIBLE • NO TELEMETRY")
+                                .small()
+                                .color(MUTED),
+                        );
                     });
                 });
                 ui.add_space(4.0);
