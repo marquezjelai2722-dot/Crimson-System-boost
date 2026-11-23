@@ -344,6 +344,21 @@ pub fn system_health_scan() -> Result<String, String> {
     Err("Windows component health scans are supported on Windows only.".into())
 }
 
+#[cfg(windows)]
+pub fn launch_system_repair() -> Result<String, String> {
+    let script = "$arguments = '/c DISM.exe /Online /Cleanup-Image /RestoreHealth && sfc.exe /scannow'; $process = Start-Process -FilePath 'cmd.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru; if ($process.ExitCode -ne 0) { exit $process.ExitCode }";
+    Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .spawn()
+        .map_err(|error| format!("Could not request elevated Windows repair: {error}"))?;
+    Ok("Requested an administrator repair window. Approve the Windows UAC prompt to run DISM RestoreHealth followed by SFC /scannow. Review the command window and restart if Windows requests it.".to_owned())
+}
+
+#[cfg(not(windows))]
+pub fn launch_system_repair() -> Result<String, String> {
+    Err("Windows component repair is supported on Windows only.".into())
+}
+
 fn bounded_output(text: String) -> String {
     bounded(text, 12_000)
 }
