@@ -36,6 +36,8 @@ enum Page {
     Logs,
     Clips,
     Desktop,
+    Drivers,
+    Health,
 }
 
 impl Page {
@@ -55,6 +57,8 @@ impl Page {
             Self::Logs => "Activity Logs",
             Self::Clips => "Crimson Clips",
             Self::Desktop => "Crimson Desktop",
+            Self::Drivers => "Driver checker",
+            Self::Health => "System health",
         }
     }
 }
@@ -88,6 +92,11 @@ pub struct CrimsonApp {
     apps_result: String,
     graphics_result: String,
     power_result: String,
+    driver_result: String,
+    health_tx: Sender<String>,
+    health_rx: Receiver<String>,
+    health_running: bool,
+    health_result: String,
 }
 
 impl Default for CrimsonApp {
@@ -120,6 +129,7 @@ impl Default for CrimsonApp {
         };
         let (scan_tx, scan_rx) = mpsc::channel();
         let (optimization_tx, optimization_rx) = mpsc::channel();
+        let (health_tx, health_rx) = mpsc::channel();
 
         Self {
             page: Page::Dashboard,
@@ -153,6 +163,11 @@ impl Default for CrimsonApp {
             apps_result: "Installed-app inventory has not been scanned.".to_owned(),
             graphics_result: "Graphics adapter inventory has not been scanned.".to_owned(),
             power_result: "Active power plan has not been checked.".to_owned(),
+            driver_result: "Driver inventory has not been scanned.".to_owned(),
+            health_tx,
+            health_rx,
+            health_running: false,
+            health_result: "No Windows health scan has been run.".to_owned(),
         }
     }
 }
@@ -267,6 +282,52 @@ impl CrimsonApp {
             self.optimization_running = false;
             self.optimization_status = result;
         }
+    }
+
+    fn start_health_scan(&mut self) {
+        if self.health_running { return; }
+        self.health_running = true;
+        self.health_result = "Running DISM component scan and SFC verification…".to_owned();
+        let sender = self.health_tx.clone();
+        thread::spawn(move || {
+            let result = diagnostics::system_health_scan()
+                .unwrap_or_else(|error| format!("Health scan failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
+    fn collect_health_result(&mut self) {
+        if let Ok(result) = self.health_rx.try_recv() {
+            self.health_running = false;
+            self.health_result = result;
+        }
+    }
+
+    fn health_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Windows component health");
+        ui.label("Checks the Windows component store and protected system files. These are scan-only operations; Crimson will not repair or replace files without a separate confirmed action.");
+        ui.add_space(10.0);
+        ui.add_enabled_ui(!self.health_running, |ui| {
+            if ui.button("Run system health scan").clicked() { self.start_health_scan(); }
+        });
+        if self.health_running { ui.spinner(); ui.label("This can take several minutes. Keep Crimson open."); }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.health_result).monospace());
+        ui.label("If corruption is detected, review the output and back up important files before attempting Windows repair.");
+    }
+
+    fn drivers_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Driver inventory");
+        ui.label("Lists installed Plug-and-Play driver versions and dates. A date alone cannot prove a driver is outdated; compare against your laptop maker or component manufacturer's support page.");
+        if ui.button("Scan installed drivers").clicked() {
+            self.driver_result = diagnostics::driver_inventory()
+                .unwrap_or_else(|error| format!("Driver inventory failed: {error}"));
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.driver_result).monospace());
+        ui.separator();
+        ui.label("Safe update path: Windows Update → Advanced options → Optional updates → Driver updates, or the Samsung / Intel support page for the exact device model.");
+        ui.label("Crimson does not bulk-download or force-install drivers. Incorrect drivers can disable Wi-Fi, graphics, audio, or startup.");
     }
 
     fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
@@ -499,6 +560,8 @@ impl CrimsonApp {
                 (Page::Logs, "Activity Logs"),
                 (Page::Clips, "Crimson Clips"),
                 (Page::Desktop, "Crimson Desktop"),
+                (Page::Drivers, "Driver checker"),
+                (Page::Health, "System health"),
             ];
             for (page, label) in sections {
                 if *label == "CORE" {
@@ -748,6 +811,7 @@ impl eframe::App for CrimsonApp {
         self.check_integrity();
         self.collect_scan_result();
         self.collect_optimization_result();
+        self.collect_health_result();
         ctx.request_repaint_after(Duration::from_secs(1));
 
         let mut style = (*ctx.style()).clone();
@@ -837,6 +901,8 @@ impl eframe::App for CrimsonApp {
                 Page::Logs => self.logs_page(ui),
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
+                Page::Drivers => self.drivers_page(ui),
+                Page::Health => self.health_page(ui),
             });
         });
     }
