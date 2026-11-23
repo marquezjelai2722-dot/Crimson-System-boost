@@ -405,6 +405,37 @@ pub fn driver_inventory() -> Result<String, String> {
     Err("Driver inventory is currently supported on Windows only.".into())
 }
 
+/// Searches the configured Windows Update service for applicable driver updates.
+#[cfg(windows)]
+pub fn windows_update_driver_inventory() -> Result<String, String> {
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$session = New-Object -ComObject Microsoft.Update.Session
+$searcher = $session.CreateUpdateSearcher()
+$result = $searcher.Search("IsInstalled=0 and Type='Driver'")
+if ($result.Updates.Count -eq 0) {
+    Write-Output 'Windows Update reports no applicable driver updates.'
+} else {
+    for ($index = 0; $index -lt $result.Updates.Count; $index++) {
+        $update = $result.Updates.Item($index)
+        $title = ([string]$update.Title) -replace '[\r\n\t]+', ' '
+        Write-Output ("{0}. {1}" -f ($index + 1), $title)
+    }
+}
+"#;
+    run(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        Duration::from_secs(120),
+    )
+    .map(bounded_output)
+}
+
+#[cfg(not(windows))]
+pub fn windows_update_driver_inventory() -> Result<String, String> {
+    Err("Windows Update driver discovery is supported on Windows only.".into())
+}
+
 #[cfg(windows)]
 pub fn open_optional_driver_updates() -> Result<String, String> {
     Command::new("cmd.exe")
