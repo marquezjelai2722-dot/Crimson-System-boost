@@ -1,4 +1,4 @@
-//! Read-only Windows diagnostics. These commands inspect state; they never modify it.
+//! Windows diagnostics plus narrowly scoped, user-confirmed maintenance helpers.
 use std::{
     io::Read,
     path::PathBuf,
