@@ -185,6 +185,97 @@ pub fn cleanup_preview() -> Result<String, String> {
     ))
 }
 
+/// Returns only direct-child files in the current user's TEMP directory that are at least seven days old.
+pub fn scan_cleanup_candidates() -> Result<Vec<PathBuf>, String> {
+    use std::time::SystemTime;
+    const MAX_ENTRIES: usize = 20_000;
+    let root = std::env::var_os("TEMP")
+        .or_else(|| std::env::var_os("TMP"))
+        .map(PathBuf::from)
+        .ok_or("Temporary directory is unavailable")?
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve TEMP directory: {error}"))?;
+    let cutoff = SystemTime::now()
+        .checked_sub(Duration::from_secs(7 * 24 * 60 * 60))
+        .ok_or("System clock is invalid")?;
+    let mut candidates = Vec::new();
+    let entries = std::fs::read_dir(&root)
+        .map_err(|error| format!("Cannot inspect {}: {error}", root.display()))?;
+    for (index, entry) in entries.enumerate() {
+        if index >= MAX_ENTRIES {
+            break;
+        }
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        let kind = match entry.file_type() {
+            Ok(kind) => kind,
+            Err(_) => continue,
+        };
+        if !kind.is_file() || kind.is_symlink() {
+            continue;
+        }
+        let metadata = match entry.metadata() {
+            Ok(metadata) if metadata.is_file() => metadata,
+            _ => continue,
+        };
+        if metadata.modified().map(|modified| modified <= cutoff).unwrap_or(false) {
+            let path = entry.path();
+            if path.parent() == Some(root.as_path()) {
+                candidates.push(path);
+            }
+        }
+    }
+    Ok(candidates)
+}
+
+/// Deletes only explicitly selected, revalidated, seven-day-old direct-child files in TEMP.
+pub fn delete_cleanup_candidates(paths: &[PathBuf]) -> Result<String, String> {
+    use std::time::SystemTime;
+    let root = std::env::var_os("TEMP")
+        .or_else(|| std::env::var_os("TMP"))
+        .map(PathBuf::from)
+        .ok_or("Temporary directory is unavailable")?
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve TEMP directory: {error}"))?;
+    let cutoff = SystemTime::now()
+        .checked_sub(Duration::from_secs(7 * 24 * 60 * 60))
+        .ok_or("System clock is invalid")?;
+    let mut deleted = 0usize;
+    let mut bytes = 0u64;
+    let mut skipped = 0usize;
+    for path in paths {
+        if path.parent() != Some(root.as_path()) {
+            skipped += 1;
+            continue;
+        }
+        let kind = match std::fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_file() && !metadata.file_type().is_symlink() => metadata,
+            _ => {
+                skipped += 1;
+                continue;
+            }
+        };
+        let old_enough = kind.modified().map(|modified| modified <= cutoff).unwrap_or(false);
+        if !old_enough {
+            skipped += 1;
+            continue;
+        }
+        match std::fs::remove_file(path) {
+            Ok(()) => {
+                deleted += 1;
+                bytes = bytes.saturating_add(kind.len());
+            }
+            Err(_) => skipped += 1,
+        }
+    }
+    Ok(format!(
+        "Cleanup complete. Deleted {deleted} selected old TEMP files ({:.1} MB). Skipped {skipped} files because they changed, were inaccessible, or were in use. No folders or nested paths were deleted.",
+        bytes as f64 / 1_048_576.0
+    ))
+}
+
 /// Performs bounded DNS and ping diagnostics against a caller-selected hostname.
 pub fn network_test(host: &str) -> Result<String, String> {
     let host = host.trim();
