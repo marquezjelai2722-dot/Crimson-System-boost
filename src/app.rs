@@ -86,6 +86,9 @@ pub struct CrimsonApp {
     network_result: String,
     startup_result: String,
     cleanup_result: String,
+    cleanup_candidates: Vec<PathBuf>,
+    cleanup_selected: Vec<bool>,
+    confirm_cleanup_delete: bool,
     process_result: String,
     service_result: String,
     apps_result: String,
@@ -162,7 +165,10 @@ impl Default for CrimsonApp {
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
                 .to_owned(),
             startup_result: "Startup inventory has not been scanned.".to_owned(),
-            cleanup_result: "Temporary-file preview has not been run.".to_owned(),
+            cleanup_result: "Temporary-file scan has not been run.".to_owned(),
+            cleanup_candidates: Vec::new(),
+            cleanup_selected: Vec::new(),
+            confirm_cleanup_delete: false,
             process_result: "Process inventory has not been scanned.".to_owned(),
             service_result: "Service inventory has not been scanned.".to_owned(),
             apps_result: "Installed-app inventory has not been scanned.".to_owned(),
@@ -496,14 +502,61 @@ impl CrimsonApp {
     }
 
     fn cleaner_page(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Temporary-file cleanup preview");
-        ui.label("This first pass measures top-level files in the current user's TEMP folder. It does not delete anything.");
-        if ui.button("Scan temporary files").clicked() {
-            self.cleanup_result = diagnostics::cleanup_preview()
-                .unwrap_or_else(|error| format!("Preview failed: {error}"));
-        }
+        ui.heading("Temporary-file cleaner");
+        ui.label("Scans only the current user TEMP folder. Eligible files must be direct children and at least seven days old. Downloads, Desktop, browser profiles, caches outside TEMP, folders and nested paths are excluded.");
+        ui.horizontal(|ui| {
+            if ui.button("Scan TEMP folder").clicked() {
+                self.scan_cleanup();
+            }
+            ui.label(egui::RichText::new(format!("{} candidates", self.cleanup_candidates.len())).strong().color(CRIMSON));
+        });
         ui.add_space(8.0);
-        ui.label(egui::RichText::new(&self.cleanup_result).monospace());
+        ui.label(egui::RichText::new(&self.cleanup_result).color(MUTED));
+        egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
+            for (index, path) in self.cleanup_candidates.iter().enumerate() {
+                let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("[non-Unicode filename]");
+                ui.checkbox(&mut self.cleanup_selected[index], name);
+            }
+        });
+        let selected_count = self.cleanup_selected.iter().filter(|selected| **selected).count();
+        ui.separator();
+        ui.label(format!("{selected_count} files selected. Files are rechecked immediately before deletion; locked or changed files are skipped."));
+        ui.checkbox(&mut self.confirm_cleanup_delete, "I reviewed the selected filenames and want to delete these TEMP files.");
+        ui.add_enabled_ui(self.confirm_cleanup_delete && selected_count > 0, |ui| {
+            if ui.button("Delete selected old TEMP files").clicked() {
+                self.delete_selected_cleanup();
+            }
+        });
+        ui.label("This is not a general disk cleaner. It never recursively deletes folders or touches user documents.");
+    }
+
+    fn scan_cleanup(&mut self) {
+        match diagnostics::scan_cleanup_candidates() {
+            Ok(paths) => {
+                self.cleanup_selected = vec![false; paths.len()];
+                self.cleanup_candidates = paths;
+                self.confirm_cleanup_delete = false;
+                self.cleanup_result = format!(
+                    "Found {} direct-child TEMP files at least 7 days old. Nothing has been deleted.",
+                    self.cleanup_candidates.len()
+                );
+            }
+            Err(error) => self.cleanup_result = format!("Cleanup scan failed: {error}"),
+        }
+    }
+
+    fn delete_selected_cleanup(&mut self) {
+        let selected: Vec<PathBuf> = self.cleanup_candidates.iter()
+            .zip(self.cleanup_selected.iter())
+            .filter_map(|(path, selected)| selected.then_some(path.clone()))
+            .collect();
+        if selected.is_empty() {
+            self.cleanup_result = "No files selected. Nothing was deleted.".to_owned();
+            return;
+        }
+        self.cleanup_result = diagnostics::delete_cleanup_candidates(&selected)
+            .unwrap_or_else(|error| format!("Cleanup failed: {error}"));
+        self.scan_cleanup();
     }
 
     fn network_diagnostics_page(&mut self, ui: &mut egui::Ui) {
@@ -607,47 +660,33 @@ impl CrimsonApp {
                 ui.label(egui::RichText::new("SYSTEM BOOST").small().color(MUTED));
             });
             ui.add_space(16.0);
-            let sections: &[(Page, &str)] = &[
-                (Page::Dashboard, "CORE"),
-                (Page::CpuGpu, "CPU & GPU"),
-                (Page::Windows, "Tweaks"),
-                (Page::Startup, "Startup"),
-                (Page::Services, "Services"),
-                (Page::Debloat, "Optional Apps"),
-                (Page::Cleaner, "Cleaner"),
-                (Page::Network, "Network"),
-                (Page::Processes, "Processes"),
-                (Page::Scanner, "Scanner"),
-                (Page::Restore, "Restore"),
-                (Page::Logs, "Activity Logs"),
-                (Page::Clips, "Crimson Clips"),
-                (Page::Desktop, "Crimson Desktop"),
-                (Page::Drivers, "Driver checker"),
-                (Page::Health, "System health"),
-            ];
-            for (page, label) in sections {
-                if *label == "CORE" {
-                    ui.label(egui::RichText::new(*label).small().color(MUTED));
-                    continue;
-                }
-                let selected = self.page == *page;
-                let text = if selected {
-                    egui::RichText::new(*label)
-                        .strong()
-                        .color(egui::Color32::WHITE)
-                } else {
-                    egui::RichText::new(*label).color(MUTED)
-                };
-                if ui.selectable_label(selected, text).clicked() {
-                    self.page = *page;
-                }
-            }
+            ui.label(egui::RichText::new("WORKSPACE").small().strong().color(MUTED));
+            nav_item(ui, &mut self.page, Page::Dashboard, "Overview");
+            nav_item(ui, &mut self.page, Page::CpuGpu, "Hardware");
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new("OPTIMIZATION").small().strong().color(MUTED));
+            nav_item(ui, &mut self.page, Page::Windows, "Windows tweaks");
+            nav_item(ui, &mut self.page, Page::Cleaner, "Temp cleaner");
+            nav_item(ui, &mut self.page, Page::Startup, "Startup apps");
+            nav_item(ui, &mut self.page, Page::Debloat, "Installed apps");
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new("DIAGNOSTICS").small().strong().color(MUTED));
+            nav_item(ui, &mut self.page, Page::Drivers, "Driver updates");
+            nav_item(ui, &mut self.page, Page::Health, "System health");
+            nav_item(ui, &mut self.page, Page::Network, "Network");
+            nav_item(ui, &mut self.page, Page::Processes, "Processes");
+            nav_item(ui, &mut self.page, Page::Services, "Services");
+            nav_item(ui, &mut self.page, Page::Scanner, "Security scanner");
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new("TOOLS").small().strong().color(MUTED));
+            nav_item(ui, &mut self.page, Page::Restore, "Restore & undo");
+            nav_item(ui, &mut self.page, Page::Logs, "Activity logs");
+            nav_item(ui, &mut self.page, Page::Clips, "Crimson Clips");
+            nav_item(ui, &mut self.page, Page::Desktop, "Desktop tools");
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-                ui.label(
-                    egui::RichText::new("NIGHT OPS  •  v0.1.0")
-                        .small()
-                        .color(MUTED),
-                );
+                ui.separator();
+                ui.label(egui::RichText::new("WINDOWS • LOCAL").small().color(MUTED));
+                ui.label(egui::RichText::new("CRIMSON  /  1.2").strong().color(CRIMSON));
             });
         });
     }
@@ -827,6 +866,29 @@ impl CrimsonApp {
         ui.label(
             "• A restore option and original-layout snapshot are required before customization.",
         );
+    }
+}
+
+fn nav_item(ui: &mut egui::Ui, current: &mut Page, page: Page, label: &str) {
+    let selected = *current == page;
+    let text = if selected {
+        egui::RichText::new(format!("  {label}")).strong().color(egui::Color32::WHITE)
+    } else {
+        egui::RichText::new(format!("  {label}")).color(MUTED)
+    };
+    let response = ui.add_sized(
+        [ui.available_width(), 34.0],
+        egui::Button::new(text).selected(selected),
+    );
+    if selected {
+        ui.painter().rect_filled(
+            egui::Rect::from_min_size(response.rect.min, egui::vec2(3.0, response.rect.height())),
+            2.0,
+            CRIMSON,
+        );
+    }
+    if response.clicked() {
+        *current = page;
     }
 }
 
