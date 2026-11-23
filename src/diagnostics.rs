@@ -499,7 +499,6 @@ try {
     )
 }
 
-
 #[cfg(not(windows))]
 pub fn system_health_scan() -> Result<String, String> {
     Err("Windows component health scans are supported on Windows only.".into())
