@@ -310,6 +310,20 @@ pub fn driver_inventory() -> Result<String, String> {
     Err("Driver inventory is currently supported on Windows only.".into())
 }
 
+#[cfg(windows)]
+pub fn open_optional_driver_updates() -> Result<String, String> {
+    Command::new("cmd.exe")
+        .args(["/C", "start", "", "ms-settings:windowsupdate-optionalupdates"])
+        .spawn()
+        .map_err(|error| format!("Could not open Windows Update: {error}"))?;
+    Ok("Opened Windows Update's optional driver updates page. Review each offered driver before installing.".to_owned())
+}
+
+#[cfg(not(windows))]
+pub fn open_optional_driver_updates() -> Result<String, String> {
+    Err("Windows Update driver controls are supported on Windows only.".into())
+}
+
 /// Runs non-repairing Windows image and protected-file checks.
 /// DISM ScanHealth and SFC verifyonly inspect; they do not repair or replace files.
 #[cfg(windows)]
