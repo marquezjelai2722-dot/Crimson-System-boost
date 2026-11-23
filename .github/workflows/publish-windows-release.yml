@@ -74,6 +74,30 @@ jobs:
             throw "Installer output is missing: $setup"
           }
 
+      - name: Smoke-test installer and uninstaller
+        shell: pwsh
+        run: |
+          $setup = (Resolve-Path "installer/Output/Crimson-System-Boost-Setup-v${{ steps.release_meta.outputs.version }}.exe").Path
+          $install = Start-Process -FilePath $setup -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Silent installer failed with exit code $($install.ExitCode)"
+          }
+          $installedExe = Join-Path $env:LOCALAPPDATA "Programs/Crimson System Boost/crimson-system-boost.exe"
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed executable was not found at $installedExe"
+          }
+          $uninstaller = Join-Path (Split-Path $installedExe) "unins000.exe"
+          if (-not (Test-Path $uninstaller)) {
+            throw "Uninstaller was not created."
+          }
+          $remove = Start-Process -FilePath $uninstaller -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -Wait -PassThru
+          if ($remove.ExitCode -ne 0) {
+            throw "Silent uninstaller failed with exit code $($remove.ExitCode)"
+          }
+          if (Test-Path $installedExe) {
+            throw "Installed executable remains after uninstall."
+          }
+
       - name: Generate SHA-256 manifest
         shell: pwsh
         run: |
@@ -102,13 +126,17 @@ jobs:
             - Reversible per-user registry changes with saved original values, verification, rollback on failure, and an undo path.
             - CPU and RAM monitoring with a bottom status bar.
             - Read-only startup, process, service, installed-app, graphics-driver, and power-plan inventories.
-            - Seven-day-old direct-child TEMP scan with per-file review, explicit deletion confirmation, and path/age revalidation.\n            - Bounded DNS/ping diagnostics, Windows component health scans, and explicitly confirmed DISM/SFC repair.\n            - Driver inventory and a user-controlled Windows Update handoff.\n            - On-demand updater that verifies the downloaded installer against the release SHA-256 manifest before asking for install approval.
+            - Seven-day-old direct-child TEMP scan with per-file review, explicit deletion confirmation, and path/age revalidation.
+            - Bounded DNS/ping diagnostics, Windows component health scans, and explicitly confirmed DISM/SFC repair.
+            - Driver inventory and a user-controlled Windows Update handoff.
+            - On-demand updater that verifies the downloaded installer against the release SHA-256 manifest before asking for install approval.
             - Runtime executable integrity checking and optional Microsoft Defender scanning.
 
             ## Important limitations
             - No guaranteed FPS increase is claimed.
             - The status bar does not yet report game FPS or GPU telemetry.
-            - Driver availability is determined by Windows Update or the device maker; Crimson does not scrape or force-install third-party driver packages.\n            - Startup changes, service control, app removal, process controls, recording, and desktop customization are not implemented.
+            - Driver availability is determined by Windows Update or the device maker; Crimson does not scrape or force-install third-party driver packages.
+            - Startup changes, service control, app removal, process controls, recording, and desktop customization are not implemented.
             - Graphics scaling, frame generation, game recording, and desktop customization are not implemented.
             - Optimization changes are limited to the documented allow-listed per-user registry settings. Defender, Firewall, Windows Update, drivers, and essential services are not disabled.
 
@@ -117,6 +145,7 @@ jobs:
           files: |
             installer/Output/Crimson-System-Boost-Setup-v${{ steps.release_meta.outputs.version }}.exe
             target/release/crimson-system-boost.exe
+            SHA256SUMS.txt
           draft: false
           prerelease: true
           make_latest: false
