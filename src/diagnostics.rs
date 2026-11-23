@@ -313,7 +313,12 @@ pub fn driver_inventory() -> Result<String, String> {
 #[cfg(windows)]
 pub fn open_optional_driver_updates() -> Result<String, String> {
     Command::new("cmd.exe")
-        .args(["/C", "start", "", "ms-settings:windowsupdate-optionalupdates"])
+        .args([
+            "/C",
+            "start",
+            "",
+            "ms-settings:windowsupdate-optionalupdates",
+        ])
         .spawn()
         .map_err(|error| format!("Could not open Windows Update: {error}"))?;
     Ok("Opened Windows Update's optional driver updates page. Review each offered driver before installing.".to_owned())
