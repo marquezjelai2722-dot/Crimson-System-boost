@@ -7,6 +7,15 @@ on:
     paths:
       - ".github/workflows/publish-windows-release.yml"
       - "installer/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "installer/**"
+      - ".github/workflows/publish-windows-release.yml"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -31,7 +40,9 @@ jobs:
         id: release_meta
         shell: pwsh
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          if ("${{ github.event_name }}" -eq "pull_request") {
+            $tag = "v1.2.0-pr-validation"
+          } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $tag = "${{ inputs.release_tag }}".Trim()
           } elseif ("${{ github.ref_type }}" -eq "branch" -and "${{ github.ref_name }}" -eq "main") {
             $tag = "v1.2.0"
@@ -112,6 +123,7 @@ jobs:
           $lines | Set-Content -LiteralPath "SHA256SUMS.txt" -Encoding ascii
 
       - name: Publish GitHub release
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_meta.outputs.tag }}
