@@ -341,7 +341,8 @@ impl CrimsonApp {
             return;
         }
         self.driver_running = true;
-        self.driver_result = "Searching the configured Windows Update service for applicable drivers…".to_owned();
+        self.driver_result =
+            "Searching the configured Windows Update service for applicable drivers…".to_owned();
         let sender = self.driver_tx.clone();
         thread::spawn(move || {
             let result = diagnostics::windows_update_driver_inventory()
@@ -490,7 +491,10 @@ impl CrimsonApp {
         ui.separator();
         ui.label("Check Microsoft's configured Windows Update service for applicable driver updates. This search is read-only; it does not download or install anything.");
         ui.add_enabled_ui(!self.driver_running, |ui| {
-            if ui.button("Check Windows Update for driver updates").clicked() {
+            if ui
+                .button("Check Windows Update for driver updates")
+                .clicked()
+            {
                 self.start_windows_update_driver_scan();
             }
         });
