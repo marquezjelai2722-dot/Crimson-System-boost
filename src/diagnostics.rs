@@ -112,27 +112,75 @@ pub fn startup_inventory() -> Result<String, String> {
     Err("Startup inventory is currently supported on Windows only.".into())
 }
 
-/// Measures candidate temporary files. It deliberately does not delete anything.
+/// Scans a bounded portion of the current user's TEMP tree without deleting anything.
 pub fn cleanup_preview() -> Result<String, String> {
+    const MAX_ENTRIES: usize = 20_000;
+    const MAX_DEPTH: usize = 4;
+
     let temp = std::env::var_os("TEMP")
         .or_else(|| std::env::var_os("TMP"))
         .map(PathBuf::from)
         .ok_or("Temporary directory is unavailable")?;
-    let mut count = 0u64;
+    let mut pending = vec![(temp.clone(), 0usize)];
+    let mut files = 0u64;
+    let mut directories = 0u64;
     let mut bytes = 0u64;
-    let entries =
-        std::fs::read_dir(&temp).map_err(|e| format!("Cannot inspect {}: {e}", temp.display()))?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if let Ok(meta) = std::fs::symlink_metadata(&path) {
-            if meta.file_type().is_file() {
-                count += 1;
-                bytes = bytes.saturating_add(meta.len());
+    let mut skipped = 0u64;
+    let mut inspected = 0usize;
+
+    while let Some((directory, depth)) = pending.pop() {
+        let entries = match std::fs::read_dir(&directory) {
+            Ok(entries) => entries,
+            Err(_) => {
+                skipped += 1;
+                continue;
+            }
+        };
+
+        for entry in entries {
+            if inspected >= MAX_ENTRIES {
+                break;
+            }
+            inspected += 1;
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(_) => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+            let kind = match entry.file_type() {
+                Ok(kind) => kind,
+                Err(_) => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+
+            if kind.is_symlink() {
+                skipped += 1;
+            } else if kind.is_file() {
+                match entry.metadata() {
+                    Ok(metadata) => {
+                        files += 1;
+                        bytes = bytes.saturating_add(metadata.len());
+                    }
+                    Err(_) => skipped += 1,
+                }
+            } else if kind.is_dir() && depth < MAX_DEPTH {
+                directories += 1;
+                pending.push((entry.path(), depth + 1));
+            } else {
+                skipped += 1;
             }
         }
+        if inspected >= MAX_ENTRIES {
+            break;
+        }
     }
+
     Ok(format!(
-        "Temporary folder: {}\nTop-level files: {count}\nPotentially reclaimable file size: {:.1} MB\n\nPreview only: nothing was deleted. Locked files, nested folders, caches and app-owned data are intentionally excluded.",
+        "Temporary folder: {}\nFiles inspected: {files}\nSubfolders inspected: {directories}\nPotential file size: {:.1} MB\nSkipped / inaccessible entries: {skipped}\n\nPreview only: nothing was deleted. Scan limits: {MAX_ENTRIES} entries and {MAX_DEPTH} folder levels. Recheck files before removal; some temporary files may be in use.",
         temp.display(), bytes as f64 / 1_048_576.0
     ))
 }
