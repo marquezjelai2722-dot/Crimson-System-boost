@@ -100,6 +100,7 @@ pub struct CrimsonApp {
     health_rx: Receiver<String>,
     health_running: bool,
     health_result: String,
+    confirm_system_repair: bool,
 }
 
 impl Default for CrimsonApp {
@@ -176,6 +177,7 @@ impl Default for CrimsonApp {
             health_rx,
             health_running: false,
             health_result: "No Windows health scan has been run.".to_owned(),
+            confirm_system_repair: false,
         }
     }
 }
@@ -350,6 +352,17 @@ impl CrimsonApp {
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.health_result).monospace());
         ui.label("If corruption is detected, review the output and back up important files before attempting Windows repair.");
+        ui.separator();
+        ui.label(egui::RichText::new("Repair Windows components").strong());
+        ui.label("This launches an elevated command window for DISM RestoreHealth and SFC /scannow. It changes Windows system files and may take a long time; approve the separate UAC prompt only if you want to proceed.");
+        ui.checkbox(&mut self.confirm_system_repair, "I have saved my work and want to request the repair.");
+        ui.add_enabled_ui(self.confirm_system_repair && !self.health_running, |ui| {
+            if ui.button("Request administrator repair").clicked() {
+                self.health_result = diagnostics::launch_system_repair()
+                    .unwrap_or_else(|error| format!("Could not start repair: {error}"));
+                self.confirm_system_repair = false;
+            }
+        });
     }
 
     fn drivers_page(&mut self, ui: &mut egui::Ui) {
