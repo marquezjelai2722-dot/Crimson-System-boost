@@ -15,7 +15,6 @@ use std::{
 use sysinfo::System;
 
 const CRIMSON: egui::Color32 = egui::Color32::from_rgb(190, 42, 58);
-const PANEL: egui::Color32 = egui::Color32::from_rgb(29, 31, 38);
 const MUTED: egui::Color32 = egui::Color32::from_rgb(157, 162, 174);
 const INTEGRITY_INTERVAL: Duration = Duration::from_secs(60);
 const METRICS_INTERVAL: Duration = Duration::from_secs(1);
@@ -93,6 +92,9 @@ pub struct CrimsonApp {
     graphics_result: String,
     power_result: String,
     driver_result: String,
+    driver_tx: Sender<String>,
+    driver_rx: Receiver<String>,
+    driver_running: bool,
     health_tx: Sender<String>,
     health_rx: Receiver<String>,
     health_running: bool,
@@ -130,6 +132,7 @@ impl Default for CrimsonApp {
         let (scan_tx, scan_rx) = mpsc::channel();
         let (optimization_tx, optimization_rx) = mpsc::channel();
         let (health_tx, health_rx) = mpsc::channel();
+        let (driver_tx, driver_rx) = mpsc::channel();
 
         Self {
             page: Page::Dashboard,
@@ -164,6 +167,9 @@ impl Default for CrimsonApp {
             graphics_result: "Graphics adapter inventory has not been scanned.".to_owned(),
             power_result: "Active power plan has not been checked.".to_owned(),
             driver_result: "Driver inventory has not been scanned.".to_owned(),
+            driver_tx,
+            driver_rx,
+            driver_running: false,
             health_tx,
             health_rx,
             health_running: false,
@@ -284,6 +290,27 @@ impl CrimsonApp {
         }
     }
 
+    fn start_driver_scan(&mut self) {
+        if self.driver_running {
+            return;
+        }
+        self.driver_running = true;
+        self.driver_result = "Reading installed driver inventory…".to_owned();
+        let sender = self.driver_tx.clone();
+        thread::spawn(move || {
+            let result = diagnostics::driver_inventory()
+                .unwrap_or_else(|error| format!("Driver inventory failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
+    fn collect_driver_result(&mut self) {
+        if let Ok(result) = self.driver_rx.try_recv() {
+            self.driver_running = false;
+            self.driver_result = result;
+        }
+    }
+
     fn start_health_scan(&mut self) {
         if self.health_running {
             return;
@@ -326,9 +353,14 @@ impl CrimsonApp {
     fn drivers_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("Driver inventory");
         ui.label("Lists installed Plug-and-Play driver versions and dates. A date alone cannot prove a driver is outdated; compare against your laptop maker or component manufacturer's support page.");
-        if ui.button("Scan installed drivers").clicked() {
-            self.driver_result = diagnostics::driver_inventory()
-                .unwrap_or_else(|error| format!("Driver inventory failed: {error}"));
+        ui.add_enabled_ui(!self.driver_running, |ui| {
+            if ui.button("Scan installed drivers").clicked() {
+                self.start_driver_scan();
+            }
+        });
+        if self.driver_running {
+            ui.spinner();
+            ui.label("Collecting device and driver metadata…");
         }
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.driver_result).monospace());
@@ -819,6 +851,7 @@ impl eframe::App for CrimsonApp {
         self.collect_scan_result();
         self.collect_optimization_result();
         self.collect_health_result();
+        self.collect_driver_result();
         ctx.request_repaint_after(Duration::from_secs(1));
 
         let mut style = (*ctx.style()).clone();
@@ -855,6 +888,21 @@ impl eframe::App for CrimsonApp {
                 });
             return;
         }
+
+        egui::TopBottomPanel::top("crimson_header")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new("CRIMSON SYSTEM BOOST").strong().color(CRIMSON).size(17.0));
+                        ui.label(egui::RichText::new(format!("{}  /  Windows utility", self.page.label())).small().color(MUTED));
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(egui::RichText::new("LOCAL • REVERSIBLE • NO TELEMETRY").small().color(MUTED));
+                    });
+                });
+                ui.add_space(4.0);
+            });
 
         egui::SidePanel::left("navigation")
             .resizable(false)
