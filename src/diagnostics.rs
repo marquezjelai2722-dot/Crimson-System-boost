@@ -244,7 +244,6 @@ pub fn graphics_inventory() -> Result<String, String> {
     Err("Graphics inventory is currently supported on Windows only.".into())
 }
 
-
 /// Lists signed Plug-and-Play drivers with version and date metadata.
 /// This is inventory only: it never downloads or installs a driver.
 #[cfg(windows)]
@@ -272,11 +271,7 @@ pub fn system_health_scan() -> Result<String, String> {
         &["/Online", "/Cleanup-Image", "/ScanHealth"],
         Duration::from_secs(240),
     )?;
-    let sfc = run(
-        "sfc.exe",
-        &["/verifyonly"],
-        Duration::from_secs(240),
-    )?;
+    let sfc = run("sfc.exe", &["/verifyonly"], Duration::from_secs(240))?;
     Ok(format!(
         "DISM component-store scan:\n{dism}\n\nSystem File Checker verification:\n{sfc}\n\nScan only: no repairs or file replacements were performed. If corruption is reported, review the result before choosing a repair."
     ))
