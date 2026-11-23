@@ -324,6 +324,11 @@ impl CrimsonApp {
                     &mut self.selected_tweaks,
                     tweaks::TweakId::DisableWindowsTips,
                 );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::DisableConsumerFeatures,
+                );
             });
         });
         ui.add_space(12.0);
@@ -342,6 +347,9 @@ impl CrimsonApp {
             }
             if clear {
                 self.selected_tweaks = [false; 7];
+            }
+            if ui.button("Undo last batch").clicked() && !self.optimization_running {
+                self.undo_latest_optimization();
             }
             if self.optimization_running {
                 ui.spinner();
@@ -744,10 +752,17 @@ impl eframe::App for CrimsonApp {
 
         let mut style = (*ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
-        style.visuals.panel_fill = PANEL;
-        style.visuals.window_fill = PANEL;
+        style.visuals.panel_fill = egui::Color32::from_rgb(12, 13, 18);
+        style.visuals.window_fill = egui::Color32::from_rgb(18, 19, 26);
+        style.visuals.extreme_bg_color = egui::Color32::from_rgb(8, 9, 13);
+        style.visuals.faint_bg_color = egui::Color32::from_rgb(26, 27, 36);
+        style.visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(24, 25, 33);
+        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(31, 32, 42);
+        style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(55, 29, 39);
         style.visuals.widgets.active.bg_fill = CRIMSON;
         style.visuals.selection.bg_fill = CRIMSON;
+        style.spacing.item_spacing = egui::vec2(10.0, 9.0);
+        style.spacing.button_padding = egui::vec2(12.0, 8.0);
         ctx.set_style(style);
 
         if self.integrity_tampered {
