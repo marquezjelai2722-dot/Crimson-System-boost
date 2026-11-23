@@ -182,13 +182,20 @@ pub fn delete_cleanup_candidates(paths: &[PathBuf]) -> Result<String, String> {
             continue;
         }
         let kind = match std::fs::symlink_metadata(path) {
-            Ok(metadata) if metadata.file_type().is_file() && !metadata.file_type().is_symlink() => metadata,
+            Ok(metadata)
+                if metadata.file_type().is_file() && !metadata.file_type().is_symlink() =>
+            {
+                metadata
+            }
             _ => {
                 skipped += 1;
                 continue;
             }
         };
-        let old_enough = kind.modified().map(|modified| modified <= cutoff).unwrap_or(false);
+        let old_enough = kind
+            .modified()
+            .map(|modified| modified <= cutoff)
+            .unwrap_or(false);
         if !old_enough {
             skipped += 1;
             continue;
