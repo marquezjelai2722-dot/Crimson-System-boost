@@ -285,7 +285,9 @@ impl CrimsonApp {
     }
 
     fn start_health_scan(&mut self) {
-        if self.health_running { return; }
+        if self.health_running {
+            return;
+        }
         self.health_running = true;
         self.health_result = "Running DISM component scan and SFC verification…".to_owned();
         let sender = self.health_tx.clone();
@@ -308,9 +310,14 @@ impl CrimsonApp {
         ui.label("Checks the Windows component store and protected system files. These are scan-only operations; Crimson will not repair or replace files without a separate confirmed action.");
         ui.add_space(10.0);
         ui.add_enabled_ui(!self.health_running, |ui| {
-            if ui.button("Run system health scan").clicked() { self.start_health_scan(); }
+            if ui.button("Run system health scan").clicked() {
+                self.start_health_scan();
+            }
         });
-        if self.health_running { ui.spinner(); ui.label("This can take several minutes. Keep Crimson open."); }
+        if self.health_running {
+            ui.spinner();
+            ui.label("This can take several minutes. Keep Crimson open.");
+        }
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.health_result).monospace());
         ui.label("If corruption is detected, review the output and back up important files before attempting Windows repair.");
