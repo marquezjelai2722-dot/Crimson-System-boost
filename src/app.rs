@@ -1217,7 +1217,11 @@ impl eframe::App for CrimsonApp {
                     ui.separator();
                     ui.label(egui::RichText::new("Game FPS  Not captured").color(MUTED));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(egui::RichText::new("LIVE SYSTEM METRICS").small().color(MUTED));
+                        ui.label(
+                            egui::RichText::new("LIVE SYSTEM METRICS")
+                                .small()
+                                .color(MUTED),
+                        );
                     });
                 });
             });
