@@ -444,7 +444,7 @@ impl CrimsonApp {
 
     fn health_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("Windows component health");
-        ui.label("Checks the Windows component store and protected system files. These are scan-only operations; Crimson will not repair or replace files without a separate confirmed action.");
+        ui.label("Checks the Windows component store and protected system files. Windows will request administrator approval (UAC) because DISM and SFC require elevation. These are scan-only operations; Crimson will not repair or replace files without a separate confirmed action.");
         ui.add_space(10.0);
         ui.add_enabled_ui(!self.health_running, |ui| {
             if ui.button("Run system health scan").clicked() {
