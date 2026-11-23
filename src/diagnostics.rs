@@ -420,6 +420,181 @@ pub fn open_optional_driver_updates() -> Result<String, String> {
     Err("Windows Update driver controls are supported on Windows only.".into())
 }
 
+/// Downloads the latest GitHub release installer only after validating its published SHA-256 manifest.
+#[cfg(windows)]
+pub fn download_verified_update(current_version: &str) -> Result<Option<PathBuf>, String> {
+    if current_version.is_empty()
+        || !current_version.chars().all(|character| character.is_ascii_digit() || character == '.')
+    {
+        return Err("The current app version is invalid.".into());
+    }
+    let script = format!(r#"
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$headers = @{ 'User-Agent' = 'Crimson-System-Boost-Updater' }
+$releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/marquezjelai2722-dot/Crimson-System-boost/releases?per_page=20'
+$release = $releases | Where-Object {{ -not $_.draft }} | Sort-Object published_at -Descending | Select-Object -First 1
+if ($null -eq $release) {{ throw 'No published GitHub release was found.' }}
+$tag = [string]$release.tag_name
+if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?
+/// DISM ScanHealth and SFC verifyonly inspect; they do not repair or replace files.
+#[cfg(windows)]
+pub fn system_health_scan() -> Result<String, String> {
+    let dism = run(
+        "DISM.exe",
+        &["/Online", "/Cleanup-Image", "/ScanHealth"],
+        Duration::from_secs(240),
+    )?;
+    let sfc = run("sfc.exe", &["/verifyonly"], Duration::from_secs(240))?;
+    Ok(format!(
+        "DISM component-store scan:\n{dism}\n\nSystem File Checker verification:\n{sfc}\n\nScan only: no repairs or file replacements were performed. If corruption is reported, review the result before choosing a repair."
+    ))
+}
+
+#[cfg(not(windows))]
+pub fn system_health_scan() -> Result<String, String> {
+    Err("Windows component health scans are supported on Windows only.".into())
+}
+
+#[cfg(windows)]
+pub fn launch_system_repair() -> Result<String, String> {
+    let script = "$arguments = '/c DISM.exe /Online /Cleanup-Image /RestoreHealth && sfc.exe /scannow'; $process = Start-Process -FilePath 'cmd.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru; if ($process.ExitCode -ne 0) { exit $process.ExitCode }";
+    Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .spawn()
+        .map_err(|error| format!("Could not request elevated Windows repair: {error}"))?;
+    Ok("Requested an administrator repair window. Approve the Windows UAC prompt to run DISM RestoreHealth followed by SFC /scannow. Review the command window and restart if Windows requests it.".to_owned())
+}
+
+#[cfg(not(windows))]
+pub fn launch_system_repair() -> Result<String, String> {
+    Err("Windows component repair is supported on Windows only.".into())
+}
+
+fn bounded_output(text: String) -> String {
+    bounded(text, 12_000)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn rejects_invalid_network_hosts() {
+        assert!(super::network_test("bad host").is_err());
+        assert!(super::network_test("").is_err());
+        assert!(super::network_test("-bad.example").is_err());
+        assert!(super::network_test("bad..example").is_err());
+    }
+
+    #[test]
+    fn output_limit_is_applied() {
+        let result = super::bounded("x".repeat(20), 10);
+        assert!(result.len() < 100);
+        assert!(result.contains("Output shortened"));
+    }
+}
+) {{ throw 'The release tag has an invalid version format.' }}
+$latestVersion = [version]($tag.Substring(1).Split('-')[0])
+$currentVersion = [version]'{current_version}'
+if ($latestVersion -le $currentVersion) {{
+    Write-Output ('NO_UPDATE|' + $tag)
+    exit 0
+}}
+$versionText = $tag.Substring(1)
+$installerName = 'Crimson-System-Boost-Setup-v' + $versionText + '.exe'
+$installerAsset = $release.assets | Where-Object {{ $_.name -eq $installerName }} | Select-Object -First 1
+$manifestAsset = $release.assets | Where-Object {{ $_.name -eq 'SHA256SUMS.txt' }} | Select-Object -First 1
+if ($null -eq $installerAsset -or $null -eq $manifestAsset) {{ throw 'Release is missing the installer or SHA256SUMS.txt.' }}
+$destination = Join-Path $env:TEMP ('Crimson-System-Boost-' + $tag + '-Setup.exe')
+$manifestPath = Join-Path $env:TEMP ('Crimson-System-Boost-' + $tag + '-SHA256SUMS.txt')
+Invoke-WebRequest -Headers $headers -Uri $installerAsset.browser_download_url -OutFile $destination
+Invoke-WebRequest -Headers $headers -Uri $manifestAsset.browser_download_url -OutFile $manifestPath
+$manifest = Get-Content -LiteralPath $manifestPath
+$line = $manifest | Where-Object {{ $_ -match ('^[A-Fa-f0-9]{{64}}\s+\*?' + [regex]::Escape($installerName) + '
+/// DISM ScanHealth and SFC verifyonly inspect; they do not repair or replace files.
+#[cfg(windows)]
+pub fn system_health_scan() -> Result<String, String> {
+    let dism = run(
+        "DISM.exe",
+        &["/Online", "/Cleanup-Image", "/ScanHealth"],
+        Duration::from_secs(240),
+    )?;
+    let sfc = run("sfc.exe", &["/verifyonly"], Duration::from_secs(240))?;
+    Ok(format!(
+        "DISM component-store scan:\n{dism}\n\nSystem File Checker verification:\n{sfc}\n\nScan only: no repairs or file replacements were performed. If corruption is reported, review the result before choosing a repair."
+    ))
+}
+
+#[cfg(not(windows))]
+pub fn system_health_scan() -> Result<String, String> {
+    Err("Windows component health scans are supported on Windows only.".into())
+}
+
+#[cfg(windows)]
+pub fn launch_system_repair() -> Result<String, String> {
+    let script = "$arguments = '/c DISM.exe /Online /Cleanup-Image /RestoreHealth && sfc.exe /scannow'; $process = Start-Process -FilePath 'cmd.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru; if ($process.ExitCode -ne 0) { exit $process.ExitCode }";
+    Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .spawn()
+        .map_err(|error| format!("Could not request elevated Windows repair: {error}"))?;
+    Ok("Requested an administrator repair window. Approve the Windows UAC prompt to run DISM RestoreHealth followed by SFC /scannow. Review the command window and restart if Windows requests it.".to_owned())
+}
+
+#[cfg(not(windows))]
+pub fn launch_system_repair() -> Result<String, String> {
+    Err("Windows component repair is supported on Windows only.".into())
+}
+
+fn bounded_output(text: String) -> String {
+    bounded(text, 12_000)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn rejects_invalid_network_hosts() {
+        assert!(super::network_test("bad host").is_err());
+        assert!(super::network_test("").is_err());
+        assert!(super::network_test("-bad.example").is_err());
+        assert!(super::network_test("bad..example").is_err());
+    }
+
+    #[test]
+    fn output_limit_is_applied() {
+        let result = super::bounded("x".repeat(20), 10);
+        assert!(result.len() < 100);
+        assert!(result.contains("Output shortened"));
+    }
+}
+) }} | Select-Object -First 1
+if ($null -eq $line) {{ Remove-Item -LiteralPath $destination -Force; throw 'Installer checksum entry was not found.' }}
+$expected = ($line -split '\s+')[0].ToLowerInvariant()
+$actual = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) {{ Remove-Item -LiteralPath $destination -Force; throw 'Installer SHA-256 mismatch. The downloaded file was deleted.' }}
+Write-Output ('DOWNLOADED|' + $destination)
+"#);
+    let output = run(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", &script],
+        Duration::from_secs(180),
+    )?;
+    if let Some(tag) = output.strip_prefix("NO_UPDATE|") {
+        return Err(format!("No newer release is available. Latest release: {tag}"));
+    }
+    let path = output
+        .strip_prefix("DOWNLOADED|")
+        .ok_or_else(|| format!("Updater returned an unexpected result: {output}"))?;
+    let installer = PathBuf::from(path.trim());
+    if !installer.is_file() {
+        return Err("The verified installer could not be found after download.".into());
+    }
+    Ok(Some(installer))
+}
+
+#[cfg(not(windows))]
+pub fn download_verified_update(_current_version: &str) -> Result<Option<PathBuf>, String> {
+    Err("The Crimson self-updater is supported on Windows only.".into())
+}
+
 /// Runs non-repairing Windows image and protected-file checks.
 /// DISM ScanHealth and SFC verifyonly inspect; they do not repair or replace files.
 #[cfg(windows)]
