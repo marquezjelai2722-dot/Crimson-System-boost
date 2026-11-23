@@ -1192,6 +1192,36 @@ impl eframe::App for CrimsonApp {
                 });
             });
 
+        egui::TopBottomPanel::bottom("crimson_status_bar")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    let cpus = self.system.cpus();
+                    let cpu = if cpus.is_empty() {
+                        0.0
+                    } else {
+                        cpus.iter().map(|core| core.cpu_usage()).sum::<f32>() / cpus.len() as f32
+                    };
+                    let total = self.system.total_memory();
+                    let used = self.system.used_memory();
+                    let memory = if total > 0 {
+                        used as f32 / total as f32 * 100.0
+                    } else {
+                        0.0
+                    };
+                    ui.label(egui::RichText::new(format!("CPU  {cpu:.1}%")).strong());
+                    ui.separator();
+                    ui.label(egui::RichText::new(format!("RAM  {memory:.1}%")).strong());
+                    ui.separator();
+                    ui.label(egui::RichText::new("GPU  Not available").color(MUTED));
+                    ui.separator();
+                    ui.label(egui::RichText::new("Game FPS  Not captured").color(MUTED));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(egui::RichText::new("LIVE SYSTEM METRICS").small().color(MUTED));
+                    });
+                });
+            });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
             ui.heading(self.page.label());
