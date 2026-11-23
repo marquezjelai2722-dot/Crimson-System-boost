@@ -37,6 +37,7 @@ enum Page {
     Desktop,
     Drivers,
     Health,
+    Updates,
 }
 
 impl Page {
@@ -58,6 +59,7 @@ impl Page {
             Self::Desktop => "Crimson Desktop",
             Self::Drivers => "Driver checker",
             Self::Health => "System health",
+            Self::Updates => "App updates",
         }
     }
 }
@@ -104,6 +106,12 @@ pub struct CrimsonApp {
     health_running: bool,
     health_result: String,
     confirm_system_repair: bool,
+    update_tx: Sender<Result<Option<PathBuf>, String>>,
+    update_rx: Receiver<Result<Option<PathBuf>, String>>,
+    update_running: bool,
+    update_status: String,
+    update_installer: Option<PathBuf>,
+    confirm_install_update: bool,
 }
 
 impl Default for CrimsonApp {
@@ -138,6 +146,7 @@ impl Default for CrimsonApp {
         let (optimization_tx, optimization_rx) = mpsc::channel();
         let (health_tx, health_rx) = mpsc::channel();
         let (driver_tx, driver_rx) = mpsc::channel();
+        let (update_tx, update_rx) = mpsc::channel();
 
         Self {
             page: Page::Dashboard,
@@ -184,6 +193,12 @@ impl Default for CrimsonApp {
             health_running: false,
             health_result: "No Windows health scan has been run.".to_owned(),
             confirm_system_repair: false,
+            update_tx,
+            update_rx,
+            update_running: false,
+            update_status: "No update check has been run. Checking for updates contacts the public GitHub Releases API.".to_owned(),
+            update_installer: None,
+            confirm_install_update: false,
         }
     }
 }
@@ -340,6 +355,68 @@ impl CrimsonApp {
             self.health_running = false;
             self.health_result = result;
         }
+    }
+
+    fn start_update_check(&mut self) {
+        if self.update_running {
+            return;
+        }
+        self.update_running = true;
+        self.update_installer = None;
+        self.confirm_install_update = false;
+        self.update_status = "Checking GitHub Releases and downloading a checksum-verified installer if a newer version exists…".to_owned();
+        let sender = self.update_tx.clone();
+        let current_version = env!("CARGO_PKG_VERSION").to_owned();
+        thread::spawn(move || {
+            let result = diagnostics::download_verified_update(&current_version);
+            let _ = sender.send(result);
+        });
+    }
+
+    fn collect_update_result(&mut self) {
+        if let Ok(result) = self.update_rx.try_recv() {
+            self.update_running = false;
+            match result {
+                Ok(Some(path)) => {
+                    self.update_status = format!("Installer downloaded and SHA-256 verified: {}", path.display());
+                    self.update_installer = Some(path);
+                }
+                Ok(None) => self.update_status = "No update available.".to_owned(),
+                Err(error) => self.update_status = error,
+            }
+        }
+    }
+
+    fn updates_page(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.heading("Crimson updater");
+        ui.label(format!("Installed version: {}. Updates are checked against the public GitHub Releases API only when you request it.", env!("CARGO_PKG_VERSION")));
+        ui.label("The updater downloads the official per-user installer, validates its SHA-256 against the release manifest, and waits for your separate approval before running it. It does not silently replace the running executable.");
+        ui.add_enabled_ui(!self.update_running, |ui| {
+            if ui.button("Check for updates").clicked() {
+                self.start_update_check();
+            }
+        });
+        if self.update_running {
+            ui.spinner();
+            ui.label("Contacting GitHub and verifying release assets…");
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.update_status).color(MUTED));
+        if self.update_installer.is_some() {
+            ui.checkbox(&mut self.confirm_install_update, "I verified that I want to run the downloaded Crimson installer and update this app.");
+            ui.add_enabled_ui(self.confirm_install_update, |ui| {
+                if ui.button("Run verified installer and close Crimson").clicked() {
+                    if let Some(path) = self.update_installer.as_ref() {
+                        match std::process::Command::new(path).spawn() {
+                            Ok(_) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                            Err(error) => self.update_status = format!("Could not launch installer: {error}"),
+                        }
+                    }
+                }
+            });
+        }
+        ui.separator();
+        ui.label("Only official GitHub release assets with a matching published SHA-256 entry are accepted. A checksum detects transfer corruption or mismatch; it is not a substitute for a signed release.");
     }
 
     fn health_page(&mut self, ui: &mut egui::Ui) {
@@ -673,6 +750,7 @@ impl CrimsonApp {
             ui.label(egui::RichText::new("DIAGNOSTICS").small().strong().color(MUTED));
             nav_item(ui, &mut self.page, Page::Drivers, "Driver updates");
             nav_item(ui, &mut self.page, Page::Health, "System health");
+            nav_item(ui, &mut self.page, Page::Updates, "App updates");
             nav_item(ui, &mut self.page, Page::Network, "Network");
             nav_item(ui, &mut self.page, Page::Processes, "Processes");
             nav_item(ui, &mut self.page, Page::Services, "Services");
@@ -686,7 +764,7 @@ impl CrimsonApp {
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
                 ui.separator();
                 ui.label(egui::RichText::new("WINDOWS • LOCAL").small().color(MUTED));
-                ui.label(egui::RichText::new("CRIMSON  /  1.2").strong().color(CRIMSON));
+                ui.label(egui::RichText::new(format!("CRIMSON  /  {}", env!("CARGO_PKG_VERSION"))).strong().color(CRIMSON));
             });
         });
     }
@@ -937,6 +1015,7 @@ impl eframe::App for CrimsonApp {
         self.collect_optimization_result();
         self.collect_health_result();
         self.collect_driver_result();
+        self.collect_update_result();
         ctx.request_repaint_after(Duration::from_secs(1));
 
         let mut style = (*ctx.style()).clone();
@@ -1059,6 +1138,7 @@ impl eframe::App for CrimsonApp {
                 Page::Desktop => self.desktop_page(ui),
                 Page::Drivers => self.drivers_page(ui),
                 Page::Health => self.health_page(ui),
+                Page::Updates => self.updates_page(ui, ctx),
             });
         });
     }
