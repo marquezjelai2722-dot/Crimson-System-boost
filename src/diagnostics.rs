@@ -220,7 +220,11 @@ pub fn scan_cleanup_candidates() -> Result<Vec<PathBuf>, String> {
             Ok(metadata) if metadata.is_file() => metadata,
             _ => continue,
         };
-        if metadata.modified().map(|modified| modified <= cutoff).unwrap_or(false) {
+        if metadata
+            .modified()
+            .map(|modified| modified <= cutoff)
+            .unwrap_or(false)
+        {
             let path = entry.path();
             if path.parent() == Some(root.as_path()) {
                 candidates.push(path);
