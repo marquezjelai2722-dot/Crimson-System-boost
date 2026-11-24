@@ -1,6 +1,6 @@
 #define MyAppName "Crimson System Boost"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.0"
+  #define MyAppVersion "1.2.0"
 #endif
 
 [Setup]
@@ -11,6 +11,9 @@ AppPublisher=Crimson System Boost
 DefaultDirName={localappdata}\Programs\Crimson System Boost
 DefaultGroupName=Crimson System Boost
 DisableProgramGroupPage=yes
+CloseApplications=yes
+RestartApplications=no
+CloseApplicationsFilter=crimson-system-boost.exe
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64

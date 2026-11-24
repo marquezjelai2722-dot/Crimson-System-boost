@@ -15,7 +15,6 @@ use std::{
 use sysinfo::System;
 
 const CRIMSON: egui::Color32 = egui::Color32::from_rgb(190, 42, 58);
-const PANEL: egui::Color32 = egui::Color32::from_rgb(29, 31, 38);
 const MUTED: egui::Color32 = egui::Color32::from_rgb(157, 162, 174);
 const INTEGRITY_INTERVAL: Duration = Duration::from_secs(60);
 const METRICS_INTERVAL: Duration = Duration::from_secs(1);
@@ -36,6 +35,9 @@ enum Page {
     Logs,
     Clips,
     Desktop,
+    Drivers,
+    Health,
+    Updates,
 }
 
 impl Page {
@@ -55,6 +57,9 @@ impl Page {
             Self::Logs => "Activity Logs",
             Self::Clips => "Crimson Clips",
             Self::Desktop => "Crimson Desktop",
+            Self::Drivers => "Driver checker",
+            Self::Health => "System health",
+            Self::Updates => "App updates",
         }
     }
 }
@@ -83,11 +88,30 @@ pub struct CrimsonApp {
     network_result: String,
     startup_result: String,
     cleanup_result: String,
+    cleanup_candidates: Vec<PathBuf>,
+    cleanup_selected: Vec<bool>,
+    confirm_cleanup_delete: bool,
     process_result: String,
     service_result: String,
     apps_result: String,
     graphics_result: String,
     power_result: String,
+    driver_result: String,
+    driver_update_status: String,
+    driver_tx: Sender<String>,
+    driver_rx: Receiver<String>,
+    driver_running: bool,
+    health_tx: Sender<String>,
+    health_rx: Receiver<String>,
+    health_running: bool,
+    health_result: String,
+    confirm_system_repair: bool,
+    update_tx: Sender<Result<Option<PathBuf>, String>>,
+    update_rx: Receiver<Result<Option<PathBuf>, String>>,
+    update_running: bool,
+    update_status: String,
+    update_installer: Option<PathBuf>,
+    confirm_install_update: bool,
 }
 
 impl Default for CrimsonApp {
@@ -120,6 +144,9 @@ impl Default for CrimsonApp {
         };
         let (scan_tx, scan_rx) = mpsc::channel();
         let (optimization_tx, optimization_rx) = mpsc::channel();
+        let (health_tx, health_rx) = mpsc::channel();
+        let (driver_tx, driver_rx) = mpsc::channel();
+        let (update_tx, update_rx) = mpsc::channel();
 
         Self {
             page: Page::Dashboard,
@@ -147,12 +174,31 @@ impl Default for CrimsonApp {
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
                 .to_owned(),
             startup_result: "Startup inventory has not been scanned.".to_owned(),
-            cleanup_result: "Temporary-file preview has not been run.".to_owned(),
+            cleanup_result: "Temporary-file scan has not been run.".to_owned(),
+            cleanup_candidates: Vec::new(),
+            cleanup_selected: Vec::new(),
+            confirm_cleanup_delete: false,
             process_result: "Process inventory has not been scanned.".to_owned(),
             service_result: "Service inventory has not been scanned.".to_owned(),
             apps_result: "Installed-app inventory has not been scanned.".to_owned(),
             graphics_result: "Graphics adapter inventory has not been scanned.".to_owned(),
             power_result: "Active power plan has not been checked.".to_owned(),
+            driver_result: "Driver inventory has not been scanned.".to_owned(),
+            driver_update_status: "No driver update page opened.".to_owned(),
+            driver_tx,
+            driver_rx,
+            driver_running: false,
+            health_tx,
+            health_rx,
+            health_running: false,
+            health_result: "No Windows health scan has been run.".to_owned(),
+            confirm_system_repair: false,
+            update_tx,
+            update_rx,
+            update_running: false,
+            update_status: "No update check has been run. Checking for updates contacts the public GitHub Releases API.".to_owned(),
+            update_installer: None,
+            confirm_install_update: false,
         }
     }
 }
@@ -269,6 +315,198 @@ impl CrimsonApp {
         }
     }
 
+    fn start_driver_scan(&mut self) {
+        if self.driver_running {
+            return;
+        }
+        self.driver_running = true;
+        self.driver_result = "Reading installed driver inventory…".to_owned();
+        let sender = self.driver_tx.clone();
+        thread::spawn(move || {
+            let result = diagnostics::driver_inventory()
+                .unwrap_or_else(|error| format!("Driver inventory failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
+    fn collect_driver_result(&mut self) {
+        if let Ok(result) = self.driver_rx.try_recv() {
+            self.driver_running = false;
+            self.driver_result = result;
+        }
+    }
+
+    fn start_windows_update_driver_scan(&mut self) {
+        if self.driver_running {
+            return;
+        }
+        self.driver_running = true;
+        self.driver_result =
+            "Searching the configured Windows Update service for applicable drivers…".to_owned();
+        let sender = self.driver_tx.clone();
+        thread::spawn(move || {
+            let result = diagnostics::windows_update_driver_inventory()
+                .unwrap_or_else(|error| format!("Windows Update driver search failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
+    fn start_health_scan(&mut self) {
+        if self.health_running {
+            return;
+        }
+        self.health_running = true;
+        self.health_result = "Running DISM component scan and SFC verification…".to_owned();
+        let sender = self.health_tx.clone();
+        thread::spawn(move || {
+            let result = diagnostics::system_health_scan()
+                .unwrap_or_else(|error| format!("Health scan failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
+    fn collect_health_result(&mut self) {
+        if let Ok(result) = self.health_rx.try_recv() {
+            self.health_running = false;
+            self.health_result = result;
+        }
+    }
+
+    fn start_update_check(&mut self) {
+        if self.update_running {
+            return;
+        }
+        self.update_running = true;
+        self.update_installer = None;
+        self.confirm_install_update = false;
+        self.update_status = "Checking GitHub Releases and downloading a checksum-verified installer if a newer version exists…".to_owned();
+        let sender = self.update_tx.clone();
+        let current_version = env!("CARGO_PKG_VERSION").to_owned();
+        thread::spawn(move || {
+            let result = diagnostics::download_verified_update(&current_version);
+            let _ = sender.send(result);
+        });
+    }
+
+    fn collect_update_result(&mut self) {
+        if let Ok(result) = self.update_rx.try_recv() {
+            self.update_running = false;
+            match result {
+                Ok(Some(path)) => {
+                    self.update_status = format!(
+                        "Installer downloaded and SHA-256 verified: {}",
+                        path.display()
+                    );
+                    self.update_installer = Some(path);
+                }
+                Ok(None) => self.update_status = "No update available.".to_owned(),
+                Err(error) => self.update_status = error,
+            }
+        }
+    }
+
+    fn updates_page(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.heading("Crimson updater");
+        ui.label(format!("Installed version: {}. Updates are checked against the public GitHub Releases API only when you request it.", env!("CARGO_PKG_VERSION")));
+        ui.label("The updater downloads the official per-user installer, validates its SHA-256 against the release manifest, and waits for your separate approval before running it. It does not silently replace the running executable.");
+        ui.add_enabled_ui(!self.update_running, |ui| {
+            if ui.button("Check for updates").clicked() {
+                self.start_update_check();
+            }
+        });
+        if self.update_running {
+            ui.spinner();
+            ui.label("Contacting GitHub and verifying release assets…");
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.update_status).color(MUTED));
+        if self.update_installer.is_some() {
+            ui.checkbox(&mut self.confirm_install_update, "I verified that I want to run the downloaded Crimson installer and update this app.");
+            ui.add_enabled_ui(self.confirm_install_update, |ui| {
+                if ui
+                    .button("Run verified installer and close Crimson")
+                    .clicked()
+                {
+                    if let Some(path) = self.update_installer.as_ref() {
+                        match std::process::Command::new(path).spawn() {
+                            Ok(_) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                            Err(error) => {
+                                self.update_status = format!("Could not launch installer: {error}")
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        ui.separator();
+        ui.label("Only official GitHub release assets with a matching published SHA-256 entry are accepted. A checksum detects transfer corruption or mismatch; it is not a substitute for a signed release.");
+    }
+
+    fn health_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Windows component health");
+        ui.label("Checks the Windows component store and protected system files. Windows will request administrator approval (UAC) because DISM and SFC require elevation. These are scan-only operations; Crimson will not repair or replace files without a separate confirmed action.");
+        ui.add_space(10.0);
+        ui.add_enabled_ui(!self.health_running, |ui| {
+            if ui.button("Run system health scan").clicked() {
+                self.start_health_scan();
+            }
+        });
+        if self.health_running {
+            ui.spinner();
+            ui.label("This can take several minutes. Keep Crimson open.");
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.health_result).monospace());
+        ui.label("If corruption is detected, review the output and back up important files before attempting Windows repair.");
+        ui.separator();
+        ui.label(egui::RichText::new("Repair Windows components").strong());
+        ui.label("This launches an elevated command window for DISM RestoreHealth and SFC /scannow. It changes Windows system files and may take a long time; approve the separate UAC prompt only if you want to proceed.");
+        ui.checkbox(
+            &mut self.confirm_system_repair,
+            "I have saved my work and want to request the repair.",
+        );
+        ui.add_enabled_ui(self.confirm_system_repair && !self.health_running, |ui| {
+            if ui.button("Request administrator repair").clicked() {
+                self.health_result = diagnostics::launch_system_repair()
+                    .unwrap_or_else(|error| format!("Could not start repair: {error}"));
+                self.confirm_system_repair = false;
+            }
+        });
+    }
+
+    fn drivers_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Driver inventory");
+        ui.label("Lists installed Plug-and-Play driver versions and dates. A date alone cannot prove a driver is outdated; compare against your laptop maker or component manufacturer's support page.");
+        ui.add_enabled_ui(!self.driver_running, |ui| {
+            if ui.button("Scan installed drivers").clicked() {
+                self.start_driver_scan();
+            }
+        });
+        if self.driver_running {
+            ui.spinner();
+            ui.label("Collecting device and driver metadata…");
+        }
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(&self.driver_result).monospace());
+        ui.separator();
+        ui.label("Check Microsoft's configured Windows Update service for applicable driver updates. This search is read-only; it does not download or install anything.");
+        ui.add_enabled_ui(!self.driver_running, |ui| {
+            if ui
+                .button("Check Windows Update for driver updates")
+                .clicked()
+            {
+                self.start_windows_update_driver_scan();
+            }
+        });
+        ui.label("Safe update path: Windows Update → Advanced options → Optional updates → Driver updates, or the Samsung / Intel support page for the exact device model.");
+        ui.label("Crimson does not bulk-download or force-install drivers. Incorrect drivers can disable Wi-Fi, graphics, audio, or startup.");
+        if ui.button("Open Windows optional driver updates").clicked() {
+            self.driver_update_status = diagnostics::open_optional_driver_updates()
+                .unwrap_or_else(|error| format!("Could not open driver updates: {error}"));
+        }
+        ui.label(egui::RichText::new(&self.driver_update_status).color(MUTED));
+    }
+
     fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
@@ -324,6 +562,11 @@ impl CrimsonApp {
                     &mut self.selected_tweaks,
                     tweaks::TweakId::DisableWindowsTips,
                 );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::DisableConsumerFeatures,
+                );
             });
         });
         ui.add_space(12.0);
@@ -342,6 +585,9 @@ impl CrimsonApp {
             }
             if clear {
                 self.selected_tweaks = [false; 7];
+            }
+            if ui.button("Undo last batch").clicked() && !self.optimization_running {
+                self.undo_latest_optimization();
             }
             if self.optimization_running {
                 ui.spinner();
@@ -365,14 +611,83 @@ impl CrimsonApp {
     }
 
     fn cleaner_page(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Temporary-file cleanup preview");
-        ui.label("This first pass measures top-level files in the current user's TEMP folder. It does not delete anything.");
-        if ui.button("Scan temporary files").clicked() {
-            self.cleanup_result = diagnostics::cleanup_preview()
-                .unwrap_or_else(|error| format!("Preview failed: {error}"));
-        }
+        ui.heading("Temporary-file cleaner");
+        ui.label("Scans only the current user TEMP folder. Eligible files must be direct children and at least seven days old. Downloads, Desktop, browser profiles, caches outside TEMP, folders and nested paths are excluded.");
+        ui.horizontal(|ui| {
+            if ui.button("Scan TEMP folder").clicked() {
+                self.scan_cleanup();
+            }
+            ui.label(
+                egui::RichText::new(format!("{} candidates", self.cleanup_candidates.len()))
+                    .strong()
+                    .color(CRIMSON),
+            );
+        });
         ui.add_space(8.0);
-        ui.label(egui::RichText::new(&self.cleanup_result).monospace());
+        ui.label(egui::RichText::new(&self.cleanup_result).color(MUTED));
+        egui::ScrollArea::vertical()
+            .max_height(300.0)
+            .show(ui, |ui| {
+                for (index, path) in self.cleanup_candidates.iter().enumerate() {
+                    let name = path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("[non-Unicode filename]");
+                    ui.checkbox(&mut self.cleanup_selected[index], name);
+                }
+            });
+        let selected_count = self
+            .cleanup_selected
+            .iter()
+            .filter(|selected| **selected)
+            .count();
+        ui.separator();
+        ui.label(format!("{selected_count} files selected. Files are rechecked immediately before deletion; locked or changed files are skipped."));
+        ui.checkbox(
+            &mut self.confirm_cleanup_delete,
+            "I reviewed the selected filenames and want to delete these TEMP files.",
+        );
+        ui.add_enabled_ui(self.confirm_cleanup_delete && selected_count > 0, |ui| {
+            if ui.button("Delete selected old TEMP files").clicked() {
+                self.delete_selected_cleanup();
+            }
+        });
+        ui.label("This is not a general disk cleaner. It never recursively deletes folders or touches user documents.");
+    }
+
+    fn scan_cleanup(&mut self) {
+        match diagnostics::scan_cleanup_candidates() {
+            Ok(paths) => {
+                self.cleanup_selected = vec![false; paths.len()];
+                self.cleanup_candidates = paths;
+                self.confirm_cleanup_delete = false;
+                self.cleanup_result = format!(
+                    "Found {} direct-child TEMP files at least 7 days old. Nothing has been deleted.",
+                    self.cleanup_candidates.len()
+                );
+            }
+            Err(error) => self.cleanup_result = format!("Cleanup scan failed: {error}"),
+        }
+    }
+
+    fn delete_selected_cleanup(&mut self) {
+        let selected: Vec<PathBuf> = self
+            .cleanup_candidates
+            .iter()
+            .zip(self.cleanup_selected.iter())
+            .filter_map(|(path, selected)| selected.then_some(path.clone()))
+            .collect();
+        if selected.is_empty() {
+            self.cleanup_result = "No files selected. Nothing was deleted.".to_owned();
+            return;
+        }
+        let report = diagnostics::delete_cleanup_candidates(&selected)
+            .unwrap_or_else(|error| format!("Cleanup failed: {error}"));
+        self.scan_cleanup();
+        self.cleanup_result = format!(
+            "{report}\n{} eligible files remain in TEMP.",
+            self.cleanup_candidates.len()
+        );
     }
 
     fn network_diagnostics_page(&mut self, ui: &mut egui::Ui) {
@@ -476,44 +791,52 @@ impl CrimsonApp {
                 ui.label(egui::RichText::new("SYSTEM BOOST").small().color(MUTED));
             });
             ui.add_space(16.0);
-            let sections: &[(Page, &str)] = &[
-                (Page::Dashboard, "CORE"),
-                (Page::CpuGpu, "CPU & GPU"),
-                (Page::Windows, "Tweaks"),
-                (Page::Startup, "Startup"),
-                (Page::Services, "Services"),
-                (Page::Debloat, "Optional Apps"),
-                (Page::Cleaner, "Cleaner"),
-                (Page::Network, "Network"),
-                (Page::Processes, "Processes"),
-                (Page::Scanner, "Scanner"),
-                (Page::Restore, "Restore"),
-                (Page::Logs, "Activity Logs"),
-                (Page::Clips, "Crimson Clips"),
-                (Page::Desktop, "Crimson Desktop"),
-            ];
-            for (page, label) in sections {
-                if *label == "CORE" {
-                    ui.label(egui::RichText::new(*label).small().color(MUTED));
-                    continue;
-                }
-                let selected = self.page == *page;
-                let text = if selected {
-                    egui::RichText::new(*label)
-                        .strong()
-                        .color(egui::Color32::WHITE)
-                } else {
-                    egui::RichText::new(*label).color(MUTED)
-                };
-                if ui.selectable_label(selected, text).clicked() {
-                    self.page = *page;
-                }
-            }
+            ui.label(
+                egui::RichText::new("WORKSPACE")
+                    .small()
+                    .strong()
+                    .color(MUTED),
+            );
+            nav_item(ui, &mut self.page, Page::Dashboard, "Overview");
+            nav_item(ui, &mut self.page, Page::CpuGpu, "Hardware");
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new("OPTIMIZATION")
+                    .small()
+                    .strong()
+                    .color(MUTED),
+            );
+            nav_item(ui, &mut self.page, Page::Windows, "Windows tweaks");
+            nav_item(ui, &mut self.page, Page::Cleaner, "Temp cleaner");
+            nav_item(ui, &mut self.page, Page::Startup, "Startup apps");
+            nav_item(ui, &mut self.page, Page::Debloat, "Installed apps");
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new("DIAGNOSTICS")
+                    .small()
+                    .strong()
+                    .color(MUTED),
+            );
+            nav_item(ui, &mut self.page, Page::Drivers, "Driver updates");
+            nav_item(ui, &mut self.page, Page::Health, "System health");
+            nav_item(ui, &mut self.page, Page::Updates, "App updates");
+            nav_item(ui, &mut self.page, Page::Network, "Network");
+            nav_item(ui, &mut self.page, Page::Processes, "Processes");
+            nav_item(ui, &mut self.page, Page::Services, "Services");
+            nav_item(ui, &mut self.page, Page::Scanner, "Security scanner");
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new("TOOLS").small().strong().color(MUTED));
+            nav_item(ui, &mut self.page, Page::Restore, "Restore & undo");
+            nav_item(ui, &mut self.page, Page::Logs, "Activity logs");
+            nav_item(ui, &mut self.page, Page::Clips, "Crimson Clips");
+            nav_item(ui, &mut self.page, Page::Desktop, "Desktop tools");
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                ui.separator();
+                ui.label(egui::RichText::new("WINDOWS • LOCAL").small().color(MUTED));
                 ui.label(
-                    egui::RichText::new("NIGHT OPS  •  v0.1.0")
-                        .small()
-                        .color(MUTED),
+                    egui::RichText::new(format!("CRIMSON  /  {}", env!("CARGO_PKG_VERSION")))
+                        .strong()
+                        .color(CRIMSON),
                 );
             });
         });
@@ -560,11 +883,11 @@ impl CrimsonApp {
         ui.add_space(20.0);
         ui.group(|ui| {
             ui.label(egui::RichText::new("Safety policy").strong().color(CRIMSON));
-            ui.label("Crimson includes individually selectable reversible tweaks plus read-only startup, cleanup and network diagnostics. Destructive cleanup and service changes remain disabled until individually verified.");
+            ui.label("Crimson includes individually selectable reversible tweaks, read-only startup and network diagnostics, and a TEMP cleaner that requires per-file review and explicit confirmation.");
             ui.label("Microsoft Defender and Windows Firewall are never disabled or reconfigured by this build.");
         });
         ui.add_space(12.0);
-        ui.label("Available now: individually selectable, reversible Windows tweaks, startup inventory, temporary-file preview, and DNS/ping diagnostics.");
+        ui.label("Available now: reversible Windows tweaks, startup and network diagnostics, reviewed TEMP-file cleanup, driver discovery, Windows health checks, and the on-demand app updater.");
     }
 
     fn scanner_page(&mut self, ui: &mut egui::Ui) {
@@ -697,6 +1020,31 @@ impl CrimsonApp {
     }
 }
 
+fn nav_item(ui: &mut egui::Ui, current: &mut Page, page: Page, label: &str) {
+    let selected = *current == page;
+    let text = if selected {
+        egui::RichText::new(format!("  {label}"))
+            .strong()
+            .color(egui::Color32::WHITE)
+    } else {
+        egui::RichText::new(format!("  {label}")).color(MUTED)
+    };
+    let response = ui.add_sized(
+        [ui.available_width(), 34.0],
+        egui::Button::new(text).selected(selected),
+    );
+    if selected {
+        ui.painter().rect_filled(
+            egui::Rect::from_min_size(response.rect.min, egui::vec2(3.0, response.rect.height())),
+            2.0,
+            CRIMSON,
+        );
+    }
+    if response.clicked() {
+        *current = page;
+    }
+}
+
 fn tweak_category_header(ui: &mut egui::Ui, title: &str, subtitle: &str) {
     ui.group(|ui| {
         ui.set_min_height(72.0);
@@ -740,14 +1088,24 @@ impl eframe::App for CrimsonApp {
         self.check_integrity();
         self.collect_scan_result();
         self.collect_optimization_result();
+        self.collect_health_result();
+        self.collect_driver_result();
+        self.collect_update_result();
         ctx.request_repaint_after(Duration::from_secs(1));
 
         let mut style = (*ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
-        style.visuals.panel_fill = PANEL;
-        style.visuals.window_fill = PANEL;
+        style.visuals.panel_fill = egui::Color32::from_rgb(12, 13, 18);
+        style.visuals.window_fill = egui::Color32::from_rgb(18, 19, 26);
+        style.visuals.extreme_bg_color = egui::Color32::from_rgb(8, 9, 13);
+        style.visuals.faint_bg_color = egui::Color32::from_rgb(26, 27, 36);
+        style.visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(24, 25, 33);
+        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(31, 32, 42);
+        style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(55, 29, 39);
         style.visuals.widgets.active.bg_fill = CRIMSON;
         style.visuals.selection.bg_fill = CRIMSON;
+        style.spacing.item_spacing = egui::vec2(10.0, 9.0);
+        style.spacing.button_padding = egui::vec2(12.0, 8.0);
         ctx.set_style(style);
 
         if self.integrity_tampered {
@@ -769,6 +1127,37 @@ impl eframe::App for CrimsonApp {
                 });
             return;
         }
+
+        egui::TopBottomPanel::top("crimson_header")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(
+                            egui::RichText::new("CRIMSON SYSTEM BOOST")
+                                .strong()
+                                .color(CRIMSON)
+                                .size(17.0),
+                        );
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{}  /  Windows utility",
+                                self.page.label()
+                            ))
+                            .small()
+                            .color(MUTED),
+                        );
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(
+                            egui::RichText::new("LOCAL • REVERSIBLE • NO TELEMETRY")
+                                .small()
+                                .color(MUTED),
+                        );
+                    });
+                });
+                ui.add_space(4.0);
+            });
 
         egui::SidePanel::left("navigation")
             .resizable(false)
@@ -822,6 +1211,9 @@ impl eframe::App for CrimsonApp {
                 Page::Logs => self.logs_page(ui),
                 Page::Clips => self.clips_page(ui),
                 Page::Desktop => self.desktop_page(ui),
+                Page::Drivers => self.drivers_page(ui),
+                Page::Health => self.health_page(ui),
+                Page::Updates => self.updates_page(ui, ctx),
             });
         });
     }

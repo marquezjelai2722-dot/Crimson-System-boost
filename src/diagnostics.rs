@@ -1,11 +1,34 @@
-//! Read-only Windows diagnostics. These commands inspect state; they never modify it.
+//! Windows diagnostics plus narrowly scoped, user-confirmed maintenance helpers.
 use std::{
-    io::Read,
+    io::{self, Read},
     path::PathBuf,
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
+
+const MAX_COMMAND_OUTPUT_BYTES: usize = 64 * 1024;
+
+fn read_capped(mut reader: impl Read, max_bytes: usize) -> io::Result<(Vec<u8>, bool)> {
+    let mut captured = Vec::with_capacity(max_bytes.min(8 * 1024));
+    let mut chunk = [0_u8; 8 * 1024];
+    let mut truncated = false;
+    loop {
+        let count = reader.read(&mut chunk)?;
+        if count == 0 {
+            break;
+        }
+        let remaining = max_bytes.saturating_sub(captured.len());
+        let keep = count.min(remaining);
+        captured.extend_from_slice(&chunk[..keep]);
+        truncated |= keep < count;
+    }
+    Ok((captured, truncated))
+}
+
+fn is_direct_child(path: &std::path::Path, root: &std::path::Path) -> bool {
+    path.parent() == Some(root)
+}
 
 fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String> {
     let mut child = Command::new(program)
@@ -22,18 +45,10 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String
         .stderr
         .take()
         .ok_or("Could not capture command errors")?;
-    let stdout_reader = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut reader = stdout;
-        let _ = reader.read_to_end(&mut bytes);
-        bytes
-    });
-    let stderr_reader = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut reader = stderr;
-        let _ = reader.read_to_end(&mut bytes);
-        bytes
-    });
+    // Drain both pipes to avoid child-process deadlocks, but retain only a fixed
+    // amount of output so noisy commands cannot grow Crimson's memory usage.
+    let stdout_reader = thread::spawn(move || read_capped(stdout, MAX_COMMAND_OUTPUT_BYTES));
+    let stderr_reader = thread::spawn(move || read_capped(stderr, MAX_COMMAND_OUTPUT_BYTES));
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
@@ -57,11 +72,20 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String
             }
         }
     };
-    let stdout = stdout_reader.join().map_err(|_| "Output reader failed")?;
-    let stderr = stderr_reader.join().map_err(|_| "Error reader failed")?;
+    let (stdout, stdout_truncated) = stdout_reader
+        .join()
+        .map_err(|_| "Output reader failed")?
+        .map_err(|error| format!("Could not read {program} output: {error}"))?;
+    let (stderr, stderr_truncated) = stderr_reader
+        .join()
+        .map_err(|_| "Error reader failed")?
+        .map_err(|error| format!("Could not read {program} errors: {error}"))?;
     let stdout = String::from_utf8_lossy(&stdout).trim().to_owned();
     let stderr = String::from_utf8_lossy(&stderr).trim().to_owned();
-    let text = if stdout.is_empty() { stderr } else { stdout };
+    let mut text = if stdout.is_empty() { stderr } else { stdout };
+    if stdout_truncated || stderr_truncated {
+        text.push_str("\n\n[Command output capped at 64 KiB per stream.]");
+    }
     if !status.success() {
         return Err(if text.is_empty() {
             format!("{program} exited with status {status}")
@@ -112,28 +136,105 @@ pub fn startup_inventory() -> Result<String, String> {
     Err("Startup inventory is currently supported on Windows only.".into())
 }
 
-/// Measures candidate temporary files. It deliberately does not delete anything.
-pub fn cleanup_preview() -> Result<String, String> {
-    let temp = std::env::var_os("TEMP")
+/// Returns only direct-child files in the current user's TEMP directory that are at least seven days old.
+pub fn scan_cleanup_candidates() -> Result<Vec<PathBuf>, String> {
+    use std::time::SystemTime;
+    const MAX_ENTRIES: usize = 20_000;
+    let root = std::env::var_os("TEMP")
         .or_else(|| std::env::var_os("TMP"))
         .map(PathBuf::from)
-        .ok_or("Temporary directory is unavailable")?;
-    let mut count = 0u64;
-    let mut bytes = 0u64;
-    let entries =
-        std::fs::read_dir(&temp).map_err(|e| format!("Cannot inspect {}: {e}", temp.display()))?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if let Ok(meta) = std::fs::symlink_metadata(&path) {
-            if meta.file_type().is_file() {
-                count += 1;
-                bytes = bytes.saturating_add(meta.len());
+        .ok_or("Temporary directory is unavailable")?
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve TEMP directory: {error}"))?;
+    let cutoff = SystemTime::now()
+        .checked_sub(Duration::from_secs(7 * 24 * 60 * 60))
+        .ok_or("System clock is invalid")?;
+    let mut candidates = Vec::new();
+    let entries = std::fs::read_dir(&root)
+        .map_err(|error| format!("Cannot inspect {}: {error}", root.display()))?;
+    for (index, entry) in entries.enumerate() {
+        if index >= MAX_ENTRIES {
+            break;
+        }
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        let kind = match entry.file_type() {
+            Ok(kind) => kind,
+            Err(_) => continue,
+        };
+        if !kind.is_file() || kind.is_symlink() {
+            continue;
+        }
+        let metadata = match entry.metadata() {
+            Ok(metadata) if metadata.is_file() => metadata,
+            _ => continue,
+        };
+        if metadata
+            .modified()
+            .map(|modified| modified <= cutoff)
+            .unwrap_or(false)
+        {
+            let path = entry.path();
+            if is_direct_child(&path, &root) {
+                candidates.push(path);
             }
         }
     }
+    Ok(candidates)
+}
+
+/// Deletes only explicitly selected, revalidated, seven-day-old direct-child files in TEMP.
+pub fn delete_cleanup_candidates(paths: &[PathBuf]) -> Result<String, String> {
+    use std::time::SystemTime;
+    let root = std::env::var_os("TEMP")
+        .or_else(|| std::env::var_os("TMP"))
+        .map(PathBuf::from)
+        .ok_or("Temporary directory is unavailable")?
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve TEMP directory: {error}"))?;
+    let cutoff = SystemTime::now()
+        .checked_sub(Duration::from_secs(7 * 24 * 60 * 60))
+        .ok_or("System clock is invalid")?;
+    let mut deleted = 0usize;
+    let mut bytes = 0u64;
+    let mut skipped = 0usize;
+    for path in paths {
+        if !is_direct_child(path, &root) {
+            skipped += 1;
+            continue;
+        }
+        let kind = match std::fs::symlink_metadata(path) {
+            Ok(metadata)
+                if metadata.file_type().is_file() && !metadata.file_type().is_symlink() =>
+            {
+                metadata
+            }
+            _ => {
+                skipped += 1;
+                continue;
+            }
+        };
+        let old_enough = kind
+            .modified()
+            .map(|modified| modified <= cutoff)
+            .unwrap_or(false);
+        if !old_enough {
+            skipped += 1;
+            continue;
+        }
+        match std::fs::remove_file(path) {
+            Ok(()) => {
+                deleted += 1;
+                bytes = bytes.saturating_add(kind.len());
+            }
+            Err(_) => skipped += 1,
+        }
+    }
     Ok(format!(
-        "Temporary folder: {}\nTop-level files: {count}\nPotentially reclaimable file size: {:.1} MB\n\nPreview only: nothing was deleted. Locked files, nested folders, caches and app-owned data are intentionally excluded.",
-        temp.display(), bytes as f64 / 1_048_576.0
+        "Cleanup complete. Deleted {deleted} selected old TEMP files ({:.1} MB). Skipped {skipped} files because they changed, were inaccessible, or were in use. No folders or nested paths were deleted.",
+        bytes as f64 / 1_048_576.0
     ))
 }
 
@@ -244,6 +345,204 @@ pub fn graphics_inventory() -> Result<String, String> {
     Err("Graphics inventory is currently supported on Windows only.".into())
 }
 
+/// Lists signed Plug-and-Play drivers with version and date metadata.
+/// This is inventory only: it never downloads or installs a driver.
+#[cfg(windows)]
+pub fn driver_inventory() -> Result<String, String> {
+    let script = "$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_PnPSignedDriver | Where-Object { $_.DeviceName } | Sort-Object DeviceName | Select-Object DeviceName, Manufacturer, DriverVersion, DriverDate, InfName | Format-Table -AutoSize | Out-String -Width 220";
+    run(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        Duration::from_secs(25),
+    )
+    .map(bounded_output)
+}
+
+#[cfg(not(windows))]
+pub fn driver_inventory() -> Result<String, String> {
+    Err("Driver inventory is currently supported on Windows only.".into())
+}
+
+/// Searches the configured Windows Update service for applicable driver updates.
+#[cfg(windows)]
+pub fn windows_update_driver_inventory() -> Result<String, String> {
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$session = New-Object -ComObject Microsoft.Update.Session
+$searcher = $session.CreateUpdateSearcher()
+$result = $searcher.Search("IsInstalled=0 and Type='Driver'")
+if ($result.Updates.Count -eq 0) {
+    Write-Output 'Windows Update reports no applicable driver updates.'
+} else {
+    for ($index = 0; $index -lt $result.Updates.Count; $index++) {
+        $update = $result.Updates.Item($index)
+        $title = ([string]$update.Title) -replace '[\r\n\t]+', ' '
+        Write-Output ("{0}. {1}" -f ($index + 1), $title)
+    }
+}
+"#;
+    run(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        Duration::from_secs(120),
+    )
+    .map(bounded_output)
+}
+
+#[cfg(not(windows))]
+pub fn windows_update_driver_inventory() -> Result<String, String> {
+    Err("Windows Update driver discovery is supported on Windows only.".into())
+}
+
+#[cfg(windows)]
+pub fn open_optional_driver_updates() -> Result<String, String> {
+    Command::new("cmd.exe")
+        .args([
+            "/C",
+            "start",
+            "",
+            "ms-settings:windowsupdate-optionalupdates",
+        ])
+        .spawn()
+        .map_err(|error| format!("Could not open Windows Update: {error}"))?;
+    Ok("Opened Windows Update's optional driver updates page. Review each offered driver before installing.".to_owned())
+}
+
+#[cfg(not(windows))]
+pub fn open_optional_driver_updates() -> Result<String, String> {
+    Err("Windows Update driver controls are supported on Windows only.".into())
+}
+
+/// Downloads the latest GitHub release installer only after validating its published SHA-256 manifest.
+#[cfg(windows)]
+pub fn download_verified_update(current_version: &str) -> Result<Option<PathBuf>, String> {
+    if current_version.is_empty()
+        || !current_version
+            .chars()
+            .all(|character| character.is_ascii_digit() || character == '.')
+    {
+        return Err("The current app version is invalid.".into());
+    }
+
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$headers = @{ 'User-Agent' = 'Crimson-System-Boost-Updater' }
+$releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/marquezjelai2722-dot/Crimson-System-boost/releases?per_page=20'
+$release = $releases | Where-Object { -not $_.draft } | Sort-Object published_at -Descending | Select-Object -First 1
+if ($null -eq $release) { throw 'No published GitHub release was found.' }
+$tag = [string]$release.tag_name
+if ($tag -notmatch '^v\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw 'The release tag has an invalid version format.' }
+$latestVersion = [version]($tag.Substring(1).Split('-')[0])
+$currentVersion = [version]'__CURRENT_VERSION__'
+if ($latestVersion -le $currentVersion) {
+    Write-Output ('NO_UPDATE|' + $tag)
+    exit 0
+}
+$versionText = $tag.Substring(1)
+$installerName = 'Crimson-System-Boost-Setup-v' + $versionText + '.exe'
+$installerAsset = $release.assets | Where-Object { $_.name -eq $installerName } | Select-Object -First 1
+$manifestAsset = $release.assets | Where-Object { $_.name -eq 'SHA256SUMS.txt' } | Select-Object -First 1
+if ($null -eq $installerAsset -or $null -eq $manifestAsset) { throw 'Release is missing the installer or SHA256SUMS.txt.' }
+$destination = Join-Path $env:TEMP ('Crimson-System-Boost-' + $tag + '-Setup.exe')
+$manifestPath = Join-Path $env:TEMP ('Crimson-System-Boost-' + $tag + '-SHA256SUMS.txt')
+Invoke-WebRequest -Headers $headers -Uri $installerAsset.browser_download_url -OutFile $destination
+Invoke-WebRequest -Headers $headers -Uri $manifestAsset.browser_download_url -OutFile $manifestPath
+$manifest = Get-Content -LiteralPath $manifestPath
+$line = $manifest | Where-Object { $_ -match ('^[A-Fa-f0-9]{64}\s+\*?' + [regex]::Escape($installerName) + '$') } | Select-Object -First 1
+if ($null -eq $line) { Remove-Item -LiteralPath $destination -Force; throw 'Installer checksum entry was not found.' }
+$expected = ($line -split '\s+')[0].ToLowerInvariant()
+$actual = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { Remove-Item -LiteralPath $destination -Force; throw 'Installer SHA-256 mismatch. The downloaded file was deleted.' }
+Write-Output ('DOWNLOADED|' + $destination)
+"#.replace("__CURRENT_VERSION__", current_version);
+
+    let output = run(
+        "powershell.exe",
+        &[
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ],
+        Duration::from_secs(180),
+    )?;
+    if output.starts_with("NO_UPDATE|") {
+        return Ok(None);
+    }
+    let path = output
+        .strip_prefix("DOWNLOADED|")
+        .ok_or_else(|| format!("Updater returned an unexpected result: {output}"))?;
+    let installer = PathBuf::from(path.trim());
+    if !installer.is_file() {
+        return Err("The verified installer could not be found after download.".into());
+    }
+    Ok(Some(installer))
+}
+
+#[cfg(not(windows))]
+pub fn download_verified_update(_current_version: &str) -> Result<Option<PathBuf>, String> {
+    Err("The Crimson self-updater is supported on Windows only.".into())
+}
+
+/// Runs non-repairing Windows image and protected-file checks with explicit UAC elevation.
+#[cfg(windows)]
+pub fn system_health_scan() -> Result<String, String> {
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$scriptPath = Join-Path $env:TEMP ('CrimsonHealth-' + [guid]::NewGuid().ToString('N') + '.ps1')
+$logPath = Join-Path $env:TEMP ('CrimsonHealth-' + [guid]::NewGuid().ToString('N') + '.log')
+$child = @'
+param([string]$LogPath)
+$ErrorActionPreference = 'Continue'
+& DISM.exe /Online /Cleanup-Image /ScanHealth *>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+$dismCode = $LASTEXITCODE
+if ($dismCode -ne 0) { exit $dismCode }
+& sfc.exe /verifyonly *>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+exit $LASTEXITCODE
+'@
+Set-Content -LiteralPath $scriptPath -Value $child -Encoding utf8
+try {
+    $arguments = '-NoProfile -File "' + $scriptPath + '" -LogPath "' + $logPath + '"'
+    $process = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru
+    if (Test-Path -LiteralPath $logPath) {
+        Get-Content -LiteralPath $logPath -Raw
+    }
+    if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+} finally {
+    Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+}
+"#;
+    run(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        Duration::from_secs(600),
+    )
+}
+
+#[cfg(not(windows))]
+pub fn system_health_scan() -> Result<String, String> {
+    Err("Windows component health scans are supported on Windows only.".into())
+}
+
+#[cfg(windows)]
+pub fn launch_system_repair() -> Result<String, String> {
+    let script = "$arguments = '/c DISM.exe /Online /Cleanup-Image /RestoreHealth && sfc.exe /scannow'; $process = Start-Process -FilePath 'cmd.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru; if ($process.ExitCode -ne 0) { exit $process.ExitCode }";
+    Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .spawn()
+        .map_err(|error| format!("Could not request elevated Windows repair: {error}"))?;
+    Ok("Requested an administrator repair window. Approve the Windows UAC prompt to run DISM RestoreHealth followed by SFC /scannow. Review the command window and restart if Windows requests it.".to_owned())
+}
+
+#[cfg(not(windows))]
+pub fn launch_system_repair() -> Result<String, String> {
+    Err("Windows component repair is supported on Windows only.".into())
+}
+
 fn bounded_output(text: String) -> String {
     bounded(text, 12_000)
 }
@@ -263,5 +562,32 @@ mod tests {
         let result = super::bounded("x".repeat(20), 10);
         assert!(result.len() < 100);
         assert!(result.contains("Output shortened"));
+    }
+
+    #[test]
+    fn command_reader_caps_retained_bytes_and_keeps_draining() {
+        use std::io::Cursor;
+
+        let input = vec![b'x'; 100_000];
+        let (captured, truncated) =
+            super::read_capped(Cursor::new(input), 1_024).expect("read should succeed");
+        assert_eq!(captured.len(), 1_024);
+        assert!(truncated);
+    }
+
+    #[test]
+    fn temp_cleanup_path_must_be_a_direct_child() {
+        use std::path::Path;
+
+        let root = Path::new("C:/Users/Test/AppData/Local/Temp");
+        assert!(super::is_direct_child(&root.join("old.tmp"), root));
+        assert!(!super::is_direct_child(
+            &root.join("nested").join("old.tmp"),
+            root
+        ));
+        assert!(!super::is_direct_child(
+            Path::new("C:/Users/Test/Downloads/file.tmp"),
+            root
+        ));
     }
 }
