@@ -1,11 +1,34 @@
 //! Windows diagnostics plus narrowly scoped, user-confirmed maintenance helpers.
 use std::{
-    io::Read,
+    io::{self, Read},
     path::PathBuf,
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
+
+const MAX_COMMAND_OUTPUT_BYTES: usize = 64 * 1024;
+
+fn read_capped(mut reader: impl Read, max_bytes: usize) -> io::Result<(Vec<u8>, bool)> {
+    let mut captured = Vec::with_capacity(max_bytes.min(8 * 1024));
+    let mut chunk = [0_u8; 8 * 1024];
+    let mut truncated = false;
+    loop {
+        let count = reader.read(&mut chunk)?;
+        if count == 0 {
+            break;
+        }
+        let remaining = max_bytes.saturating_sub(captured.len());
+        let keep = count.min(remaining);
+        captured.extend_from_slice(&chunk[..keep]);
+        truncated |= keep < count;
+    }
+    Ok((captured, truncated))
+}
+
+fn is_direct_child(path: &std::path::Path, root: &std::path::Path) -> bool {
+    path.parent() == Some(root)
+}
 
 fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String> {
     let mut child = Command::new(program)
@@ -22,18 +45,12 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String
         .stderr
         .take()
         .ok_or("Could not capture command errors")?;
-    let stdout_reader = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut reader = stdout;
-        let _ = reader.read_to_end(&mut bytes);
-        bytes
-    });
-    let stderr_reader = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut reader = stderr;
-        let _ = reader.read_to_end(&mut bytes);
-        bytes
-    });
+    // Drain both pipes to avoid child-process deadlocks, but retain only a fixed
+    // amount of output so noisy commands cannot grow Crimson's memory usage.
+    let stdout_reader =
+        thread::spawn(move || read_capped(stdout, MAX_COMMAND_OUTPUT_BYTES));
+    let stderr_reader =
+        thread::spawn(move || read_capped(stderr, MAX_COMMAND_OUTPUT_BYTES));
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
@@ -57,11 +74,20 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String
             }
         }
     };
-    let stdout = stdout_reader.join().map_err(|_| "Output reader failed")?;
-    let stderr = stderr_reader.join().map_err(|_| "Error reader failed")?;
+    let (stdout, stdout_truncated) = stdout_reader
+        .join()
+        .map_err(|_| "Output reader failed")?
+        .map_err(|error| format!("Could not read {program} output: {error}"))?;
+    let (stderr, stderr_truncated) = stderr_reader
+        .join()
+        .map_err(|_| "Error reader failed")?
+        .map_err(|error| format!("Could not read {program} errors: {error}"))?;
     let stdout = String::from_utf8_lossy(&stdout).trim().to_owned();
     let stderr = String::from_utf8_lossy(&stderr).trim().to_owned();
-    let text = if stdout.is_empty() { stderr } else { stdout };
+    let mut text = if stdout.is_empty() { stderr } else { stdout };
+    if stdout_truncated || stderr_truncated {
+        text.push_str("\n\n[Command output capped at 64 KiB per stream.]");
+    }
     if !status.success() {
         return Err(if text.is_empty() {
             format!("{program} exited with status {status}")
@@ -153,7 +179,7 @@ pub fn scan_cleanup_candidates() -> Result<Vec<PathBuf>, String> {
             .unwrap_or(false)
         {
             let path = entry.path();
-            if path.parent() == Some(root.as_path()) {
+            if is_direct_child(&path, &root) {
                 candidates.push(path);
             }
         }
@@ -177,7 +203,7 @@ pub fn delete_cleanup_candidates(paths: &[PathBuf]) -> Result<String, String> {
     let mut bytes = 0u64;
     let mut skipped = 0usize;
     for path in paths {
-        if path.parent() != Some(root.as_path()) {
+        if !is_direct_child(path, &root) {
             skipped += 1;
             continue;
         }
@@ -538,5 +564,32 @@ mod tests {
         let result = super::bounded("x".repeat(20), 10);
         assert!(result.len() < 100);
         assert!(result.contains("Output shortened"));
+    }
+
+    #[test]
+    fn command_reader_caps_retained_bytes_and_keeps_draining() {
+        use std::io::Cursor;
+
+        let input = vec![b'x'; 100_000];
+        let (captured, truncated) =
+            super::read_capped(Cursor::new(input), 1_024).expect("read should succeed");
+        assert_eq!(captured.len(), 1_024);
+        assert!(truncated);
+    }
+
+    #[test]
+    fn temp_cleanup_path_must_be_a_direct_child() {
+        use std::path::Path;
+
+        let root = Path::new("C:/Users/Test/AppData/Local/Temp");
+        assert!(super::is_direct_child(&root.join("old.tmp"), root));
+        assert!(!super::is_direct_child(
+            &root.join("nested").join("old.tmp"),
+            root
+        ));
+        assert!(!super::is_direct_child(
+            Path::new("C:/Users/Test/Downloads/file.tmp"),
+            root
+        ));
     }
 }
