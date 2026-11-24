@@ -47,10 +47,8 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Result<String, String
         .ok_or("Could not capture command errors")?;
     // Drain both pipes to avoid child-process deadlocks, but retain only a fixed
     // amount of output so noisy commands cannot grow Crimson's memory usage.
-    let stdout_reader =
-        thread::spawn(move || read_capped(stdout, MAX_COMMAND_OUTPUT_BYTES));
-    let stderr_reader =
-        thread::spawn(move || read_capped(stderr, MAX_COMMAND_OUTPUT_BYTES));
+    let stdout_reader = thread::spawn(move || read_capped(stdout, MAX_COMMAND_OUTPUT_BYTES));
+    let stderr_reader = thread::spawn(move || read_capped(stderr, MAX_COMMAND_OUTPUT_BYTES));
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
