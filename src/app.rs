@@ -883,11 +883,11 @@ impl CrimsonApp {
         ui.add_space(20.0);
         ui.group(|ui| {
             ui.label(egui::RichText::new("Safety policy").strong().color(CRIMSON));
-            ui.label("Crimson includes individually selectable reversible tweaks plus read-only startup, cleanup and network diagnostics. Destructive cleanup and service changes remain disabled until individually verified.");
+            ui.label("Crimson includes individually selectable reversible tweaks, read-only startup and network diagnostics, and a TEMP cleaner that requires per-file review and explicit confirmation.");
             ui.label("Microsoft Defender and Windows Firewall are never disabled or reconfigured by this build.");
         });
         ui.add_space(12.0);
-        ui.label("Available now: individually selectable, reversible Windows tweaks, startup inventory, temporary-file preview, and DNS/ping diagnostics.");
+        ui.label("Available now: reversible Windows tweaks, startup and network diagnostics, reviewed TEMP-file cleanup, driver discovery, Windows health checks, and the on-demand app updater.");
     }
 
     fn scanner_page(&mut self, ui: &mut egui::Ui) {
@@ -1189,40 +1189,6 @@ impl eframe::App for CrimsonApp {
                     ui.label("GPU — telemetry unavailable");
                     ui.separator();
                     ui.label("GAME FPS — no frame-capture source connected");
-                });
-            });
-
-        egui::TopBottomPanel::bottom("crimson_status_bar")
-            .resizable(false)
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    let cpus = self.system.cpus();
-                    let cpu = if cpus.is_empty() {
-                        0.0
-                    } else {
-                        cpus.iter().map(|core| core.cpu_usage()).sum::<f32>() / cpus.len() as f32
-                    };
-                    let total = self.system.total_memory();
-                    let used = self.system.used_memory();
-                    let memory = if total > 0 {
-                        used as f32 / total as f32 * 100.0
-                    } else {
-                        0.0
-                    };
-                    ui.label(egui::RichText::new(format!("CPU  {cpu:.1}%")).strong());
-                    ui.separator();
-                    ui.label(egui::RichText::new(format!("RAM  {memory:.1}%")).strong());
-                    ui.separator();
-                    ui.label(egui::RichText::new("GPU  Not available").color(MUTED));
-                    ui.separator();
-                    ui.label(egui::RichText::new("Game FPS  Not captured").color(MUTED));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(
-                            egui::RichText::new("LIVE SYSTEM METRICS")
-                                .small()
-                                .color(MUTED),
-                        );
-                    });
                 });
             });
 
