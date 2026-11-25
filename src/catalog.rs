@@ -513,7 +513,7 @@ static ENTRIES: [CatalogEntry; 500] = [
     CatalogEntry { id: 500, category: "Network", subsystem: "Packet loss and latency", review: "Packet loss and latency — Repeat test comparison", guidance: "Inspect repeat test comparison for Packet loss and latency. Record the current state, check Windows or the device manufacturer's supported interface for compatibility and policy overrides, and verify the result after any user-approved change. This task is read-only unless a separate supported action is explicitly offered." },
 ];
 
-pub const CATALOG_COUNT: usize = ENTRIES.len();
+pub const CATALOG_COUNT: usize = 500;
 
 pub fn entries() -> Vec<CatalogEntry> {
     ENTRIES.to_vec()
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn catalog_contains_500_unique_named_targets() {
-        assert_eq!(ENTRIES.len(), 500);
+        assert_eq!(ENTRIES.len(), CATALOG_COUNT);
         let mut ids = ENTRIES.iter().map(|entry| entry.id).collect::<Vec<_>>();
         ids.sort_unstable();
         ids.dedup();
