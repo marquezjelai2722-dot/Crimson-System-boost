@@ -408,7 +408,7 @@ impl CrimsonApp {
         self.emergency_running = true;
         self.last_emergency_scan = Instant::now();
         self.emergency_status =
-            "Checking recent Windows Update failures and device errors…".to_owned();
+            "Checking device status and recent Windows Update events…".to_owned();
         let sender = self.emergency_tx.clone();
         thread::spawn(move || {
             let result = maintenance::scan_emergency_conditions();
