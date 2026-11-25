@@ -517,30 +517,58 @@ impl CrimsonApp {
         ui.add_space(8.0);
 
         ui.horizontal_wrapped(|ui| {
-            if ui.selectable_label(self.selected_profile == "Normal", "Normal").clicked() {
+            if ui
+                .selectable_label(self.selected_profile == "Normal", "Normal")
+                .clicked()
+            {
                 self.selected_profile = "Normal";
                 self.selected_tweaks = [false, true, false, false, false, false, false];
             }
-            if ui.selectable_label(self.selected_profile == "Advanced", "Advanced").clicked() {
+            if ui
+                .selectable_label(self.selected_profile == "Advanced", "Advanced")
+                .clicked()
+            {
                 self.selected_profile = "Advanced";
                 self.selected_tweaks = [true, true, true, true, true, false, false];
             }
-            if ui.selectable_label(self.selected_profile == "Max FPS for gaming", "Max FPS for gaming").clicked() {
+            if ui
+                .selectable_label(
+                    self.selected_profile == "Max FPS for gaming",
+                    "Max FPS for gaming",
+                )
+                .clicked()
+            {
                 self.selected_profile = "Max FPS for gaming";
                 self.selected_tweaks = [true, true, true, true, false, false, false];
             }
-            if ui.selectable_label(self.selected_profile == "Everything safe", "Everything safe").clicked() {
+            if ui
+                .selectable_label(
+                    self.selected_profile == "Everything safe",
+                    "Everything safe",
+                )
+                .clicked()
+            {
                 self.selected_profile = "Everything safe";
                 self.selected_tweaks = [true; 7];
             }
         });
-        ui.label(egui::RichText::new(match self.selected_profile {
-            "Normal" => "A light baseline: Windows Game Mode only.",
-            "Advanced" => "Selects the available gaming, visual, and consumer-experience tweaks.",
-            "Max FPS for gaming" => "Selects the available game-capture, Game Mode, and visual-effect options. No FPS gain is guaranteed.",
-            "Everything safe" => "Selects every currently available reversible tweak in this library.",
-            _ => "Custom selection: choose individual tweaks below.",
-        }).small().color(MUTED));
+        ui.label(
+            egui::RichText::new(match self.selected_profile {
+                "Normal" => "A light baseline: Windows Game Mode only.",
+                "Advanced" => {
+                    "Selects the available gaming, visual, and consumer-experience tweaks."
+                }
+                "Max FPS for gaming" => {
+                    "Selects the available game-capture, Game Mode, and visual-effect options. No FPS gain is guaranteed."
+                }
+                "Everything safe" => {
+                    "Selects every currently available reversible tweak in this library."
+                }
+                _ => "Custom selection: choose individual tweaks below.",
+            })
+            .small()
+            .color(MUTED),
+        );
         ui.add_space(12.0);
 
         let selection_before_cards = self.selected_tweaks;
@@ -557,20 +585,56 @@ impl CrimsonApp {
         ui.add_space(14.0);
         ui.columns(3, |columns| {
             columns[0].vertical(|ui| {
-                tweak_category_header(ui, "GAMING", "Game capture and Windows game scheduling");
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameCaptureOff);
+                tweak_category_header(
+                    ui,
+                    "GAMING",
+                    "Game capture and Windows game scheduling",
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::GameCaptureOff,
+                );
                 tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameModeOn);
             });
             columns[1].vertical(|ui| {
-                tweak_category_header(ui, "PERFORMANCE", "Windows visual effects and responsiveness");
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::TransparencyOff);
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::VisualEffectsPerformance);
+                tweak_category_header(
+                    ui,
+                    "PERFORMANCE",
+                    "Windows visual effects and responsiveness",
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::TransparencyOff,
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::VisualEffectsPerformance,
+                );
             });
             columns[2].vertical(|ui| {
-                tweak_category_header(ui, "PRIVACY", "Optional suggestions and notification content");
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableAppSuggestions);
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableWindowsTips);
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableConsumerFeatures);
+                tweak_category_header(
+                    ui,
+                    "PRIVACY",
+                    "Optional suggestions and notification content",
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::DisableAppSuggestions,
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::DisableWindowsTips,
+                );
+                tweak_card(
+                    ui,
+                    &mut self.selected_tweaks,
+                    tweaks::TweakId::DisableConsumerFeatures,
+                );
             });
         });
         if self.selected_tweaks != selection_before_cards {
@@ -582,7 +646,9 @@ impl CrimsonApp {
             let mut apply = false;
             let mut clear = false;
             ui.add_enabled_ui(!self.optimization_running, |ui| {
-                apply = ui.button(egui::RichText::new("Apply selected tweaks").strong()).clicked();
+                apply = ui
+                    .button(egui::RichText::new("Apply selected tweaks").strong())
+                    .clicked();
                 clear = ui.button("Clear selection").clicked();
             });
             if apply {
