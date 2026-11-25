@@ -884,8 +884,6 @@ impl CrimsonApp {
         const CATALOG_PAGE_SIZE: usize = 30;
         let page_count = matching.len().div_ceil(CATALOG_PAGE_SIZE).max(1);
         self.catalog_page = self.catalog_page.min(page_count - 1);
-        let start = self.catalog_page * CATALOG_PAGE_SIZE;
-        let end = (start + CATALOG_PAGE_SIZE).min(matching.len());
         ui.horizontal(|ui| {
             if ui
                 .add_enabled(self.catalog_page > 0, egui::Button::new("Previous"))
@@ -900,10 +898,15 @@ impl CrimsonApp {
             {
                 self.catalog_page += 1;
             }
-            ui.label(format!("Showing {}–{} of {}", if matching.is_empty() { 0 } else { start + 1 }, end, matching.len()));
         });
         let start = self.catalog_page * CATALOG_PAGE_SIZE;
         let end = (start + CATALOG_PAGE_SIZE).min(matching.len());
+        ui.label(format!(
+            "Showing {}–{} of {}",
+            if matching.is_empty() { 0 } else { start + 1 },
+            end,
+            matching.len()
+        ));
         ui.columns(3, |columns| {
             for (index, entry) in matching[start..end].iter().enumerate() {
                 columns[index % 3].group(|ui| {
