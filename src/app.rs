@@ -882,11 +882,8 @@ impl CrimsonApp {
             for (index, entry) in matching.iter().enumerate() {
                 columns[index % 3].group(|ui| {
                     ui.label(
-                        egui::RichText::new(format!(
-                            "#{:03}  {}",
-                            entry.id, entry.category
-                        ))
-                        .strong(),
+                        egui::RichText::new(format!("#{:03}  {}", entry.id, entry.category))
+                            .strong(),
                     );
                     ui.label(egui::RichText::new(entry.review).color(CRIMSON).small());
                     ui.label(egui::RichText::new(entry.guidance).small().color(MUTED));
