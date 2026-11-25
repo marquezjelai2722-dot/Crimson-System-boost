@@ -187,7 +187,10 @@ mod tests {
     fn report_only_flags_nonempty_issue_list() {
         let clean = EmergencyReport {
             issues: Vec::new(),
-            notes: vec!["A recent update error was recorded, but it is not confirmed unresolved.".to_owned()],
+            notes: vec![
+                "A recent update error was recorded, but it is not confirmed unresolved."
+                    .to_owned(),
+            ],
             summary: "No urgent device issues".to_owned(),
         };
         let urgent = EmergencyReport {
