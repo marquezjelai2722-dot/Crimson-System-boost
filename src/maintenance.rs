@@ -109,6 +109,9 @@ if ($issues.Count -eq 0) {
         summary.push_str(if summary.is_empty() { "" } else { "\n" });
         summary.push_str(&warnings.join("\n"));
     }
+    if summary.is_empty() && !issues.is_empty() {
+        summary = format!("Detected {} urgent Windows Update or device issue(s).", issues.len());
+    }
     if summary.is_empty() && issues.is_empty() {
         summary = "The emergency scan completed, but Windows returned no recognizable status.".to_owned();
     }
