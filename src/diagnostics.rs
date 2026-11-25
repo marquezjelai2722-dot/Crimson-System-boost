@@ -428,7 +428,7 @@ pub fn download_verified_update(current_version: &str) -> Result<Option<PathBuf>
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $headers = @{ 'User-Agent' = 'Crimson-System-Boost-Updater' }
-$releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/marquezjelai2722-dot/Crimson-System-boost/releases?per_page=20'
+$releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/marquezjelai2722-dot/Crimson-System-boost/releases?per_page=100'
 $release = $releases | Where-Object { -not $_.draft -and -not $_.prerelease } | Sort-Object published_at -Descending | Select-Object -First 1
 if ($null -eq $release) { throw 'No published GitHub release was found.' }
 $tag = [string]$release.tag_name
