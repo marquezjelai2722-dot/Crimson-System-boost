@@ -553,7 +553,7 @@ impl CrimsonApp {
                             .strong()
                             .size(16.0),
                     );
-                    ui.label("Crimson detected devices reporting a Plug-and-Play problem code. Recent Windows Update error events are listed as warnings separately because an old error event does not prove that updating is still broken.");
+                    ui.label("Crimson detected a device problem code that needs review. Historical Windows Update errors and disconnected devices are shown as notes, not automatic emergencies.");
                     for issue in report.issues.iter().take(6) {
                         ui.label(
                             egui::RichText::new(format!("• {issue}"))
@@ -575,7 +575,7 @@ impl CrimsonApp {
                     if ui
                         .add_enabled(
                             self.confirm_emergency_repair && !self.health_running,
-                            egui::Button::new("Repair Windows files"),
+                            egui::Button::new("Run system-file repair (DISM + SFC)"),
                         )
                         .clicked()
                     {
