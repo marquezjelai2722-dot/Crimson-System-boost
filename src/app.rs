@@ -2,6 +2,8 @@
 mod catalog;
 #[path = "diagnostics.rs"]
 mod diagnostics;
+#[path = "maintenance.rs"]
+mod maintenance;
 #[path = "security.rs"]
 mod security;
 #[path = "tweaks.rs"]
@@ -20,6 +22,7 @@ const CRIMSON: egui::Color32 = egui::Color32::from_rgb(190, 42, 58);
 const MUTED: egui::Color32 = egui::Color32::from_rgb(157, 162, 174);
 const INTEGRITY_INTERVAL: Duration = Duration::from_secs(60);
 const METRICS_INTERVAL: Duration = Duration::from_secs(1);
+const EMERGENCY_SCAN_INTERVAL: Duration = Duration::from_secs(300);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
@@ -110,6 +113,13 @@ pub struct CrimsonApp {
     health_running: bool,
     health_result: String,
     confirm_system_repair: bool,
+    confirm_emergency_repair: bool,
+    emergency_tx: Sender<Result<maintenance::EmergencyReport, String>>,
+    emergency_rx: Receiver<Result<maintenance::EmergencyReport, String>>,
+    emergency_running: bool,
+    emergency_report: Option<maintenance::EmergencyReport>,
+    emergency_status: String,
+    last_emergency_scan: Instant,
     update_tx: Sender<Result<Option<PathBuf>, String>>,
     update_rx: Receiver<Result<Option<PathBuf>, String>>,
     update_running: bool,
@@ -151,6 +161,12 @@ impl Default for CrimsonApp {
         let (health_tx, health_rx) = mpsc::channel();
         let (driver_tx, driver_rx) = mpsc::channel();
         let (update_tx, update_rx) = mpsc::channel();
+        let (emergency_tx, emergency_rx) = mpsc::channel();
+        let emergency_sender = emergency_tx.clone();
+        thread::spawn(move || {
+            let result = maintenance::scan_emergency_conditions();
+            let _ = emergency_sender.send(result);
+        });
 
         Self {
             page: Page::Dashboard,
@@ -199,6 +215,13 @@ impl Default for CrimsonApp {
             health_running: false,
             health_result: "No Windows health scan has been run.".to_owned(),
             confirm_system_repair: false,
+            confirm_emergency_repair: false,
+            emergency_tx,
+            emergency_rx,
+            emergency_running: true,
+            emergency_report: None,
+            emergency_status: "Checking Windows Update events and device health…".to_owned(),
+            last_emergency_scan: Instant::now(),
             update_tx,
             update_rx,
             update_running: false,
@@ -378,6 +401,65 @@ impl CrimsonApp {
         }
     }
 
+    fn start_emergency_scan(&mut self) {
+        if self.emergency_running {
+            return;
+        }
+        self.emergency_running = true;
+        self.last_emergency_scan = Instant::now();
+        self.emergency_status =
+            "Checking recent Windows Update failures and device errors…".to_owned();
+        let sender = self.emergency_tx.clone();
+        thread::spawn(move || {
+            let result = maintenance::scan_emergency_conditions();
+            let _ = sender.send(result);
+        });
+    }
+
+    fn collect_emergency_scan(&mut self) {
+        if let Ok(result) = self.emergency_rx.try_recv() {
+            self.emergency_running = false;
+            match result {
+                Ok(report) => {
+                    self.emergency_status = report.summary.clone();
+                    self.emergency_report = Some(report);
+                }
+                Err(error) => {
+                    self.emergency_status = format!("Emergency scan could not complete: {error}");
+                    self.emergency_report = None;
+                }
+            }
+        }
+    }
+
+    fn start_windows_update_detection(&mut self) {
+        if self.driver_running {
+            return;
+        }
+        self.driver_running = true;
+        self.driver_result = "Requesting Windows Automatic Updates detection…".to_owned();
+        let sender = self.driver_tx.clone();
+        thread::spawn(move || {
+            let result = maintenance::request_windows_update_detection()
+                .unwrap_or_else(|error| format!("Windows Update request failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
+    fn start_device_rescan(&mut self) {
+        if self.driver_running {
+            return;
+        }
+        self.driver_running = true;
+        self.driver_result = "Requesting a Plug-and-Play device rescan…".to_owned();
+        let sender = self.driver_tx.clone();
+        thread::spawn(move || {
+            let result = maintenance::request_device_rescan()
+                .unwrap_or_else(|error| format!("Device rescan failed: {error}"));
+            let _ = sender.send(result);
+        });
+    }
+
     fn start_update_check(&mut self) {
         if self.update_running {
             return;
@@ -448,8 +530,101 @@ impl CrimsonApp {
         ui.label("Only official GitHub release assets with a matching published SHA-256 entry are accepted. A checksum detects transfer corruption or mismatch; it is not a substitute for a signed release.");
     }
 
+    fn emergency_banner(&mut self, ui: &mut egui::Ui) {
+        if self.emergency_running {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label(
+                    egui::RichText::new(&self.emergency_status)
+                        .small()
+                        .color(MUTED),
+                );
+            });
+            return;
+        }
+
+        let report = self.emergency_report.clone();
+        if let Some(report) = report {
+            if report.has_urgent_issues() {
+                ui.group(|ui| {
+                    ui.colored_label(
+                        egui::Color32::RED,
+                        egui::RichText::new("EMERGENCY REPAIR PRIORITY")
+                            .strong()
+                            .size(16.0),
+                    );
+                    ui.label("Crimson detected recent Windows Update failures or devices reporting a Plug-and-Play problem code. Review the findings before repairing.");
+                    for issue in report.issues.iter().take(6) {
+                        ui.label(
+                            egui::RichText::new(format!("• {issue}"))
+                                .color(egui::Color32::LIGHT_RED),
+                        );
+                    }
+                    if report.issues.len() > 6 {
+                        ui.label(format!(
+                            "And {} more findings. Open System health for the full scan status.",
+                            report.issues.len() - 6
+                        ));
+                    }
+                    ui.checkbox(
+                        &mut self.confirm_emergency_repair,
+                        "I saved my work and want to run Windows component repair (DISM + SFC).",
+                    );
+                });
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .add_enabled(
+                            self.confirm_emergency_repair && !self.health_running,
+                            egui::Button::new("Repair Windows files"),
+                        )
+                        .clicked()
+                    {
+                        self.health_result =
+                            diagnostics::launch_system_repair().unwrap_or_else(|error| {
+                                format!("Could not start Windows repair: {error}")
+                            });
+                        self.confirm_emergency_repair = false;
+                    }
+                    if ui
+                        .add_enabled(
+                            !self.driver_running,
+                            egui::Button::new("Start Windows Update scan"),
+                        )
+                        .clicked()
+                    {
+                        self.start_windows_update_detection();
+                    }
+                    if ui
+                        .add_enabled(!self.driver_running, egui::Button::new("Rescan devices"))
+                        .clicked()
+                    {
+                        self.start_device_rescan();
+                    }
+                    if ui.button("Open driver updates").clicked() {
+                        self.driver_update_status = diagnostics::open_optional_driver_updates()
+                            .unwrap_or_else(|error| {
+                                format!("Could not open driver updates: {error}")
+                            });
+                    }
+                    if ui.button("Recheck").clicked() {
+                        self.start_emergency_scan();
+                    }
+                });
+                ui.add_space(8.0);
+            }
+        }
+    }
+
     fn health_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("Windows component health");
+        ui.label(
+            egui::RichText::new(format!("Emergency scan: {}", self.emergency_status)).color(MUTED),
+        );
+        if let Some(report) = self.emergency_report.clone() {
+            for note in report.notes {
+                ui.colored_label(MUTED, note);
+            }
+        }
         ui.label("Checks the Windows component store and protected system files. Windows will request administrator approval (UAC) because DISM and SFC require elevation. These are scan-only operations; Crimson will not repair or replace files without a separate confirmed action.");
         ui.add_space(10.0);
         ui.add_enabled_ui(!self.health_running, |ui| {
@@ -464,6 +639,20 @@ impl CrimsonApp {
         ui.add_space(8.0);
         ui.label(egui::RichText::new(&self.health_result).monospace());
         ui.label("If corruption is detected, review the output and back up important files before attempting Windows repair.");
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add_enabled(
+                    !self.driver_running,
+                    egui::Button::new("Request Windows Update detection"),
+                )
+                .clicked()
+            {
+                self.start_windows_update_detection();
+            }
+            if ui.button("Recheck emergency conditions").clicked() {
+                self.start_emergency_scan();
+            }
+        });
         ui.separator();
         ui.label(egui::RichText::new("Repair Windows components").strong());
         ui.label("This launches an elevated command window for DISM RestoreHealth and SFC /scannow. It changes Windows system files and may take a long time; approve the separate UAC prompt only if you want to proceed.");
@@ -506,6 +695,26 @@ impl CrimsonApp {
         });
         ui.label("Safe update path: Windows Update → Advanced options → Optional updates → Driver updates, or the Samsung / Intel support page for the exact device model.");
         ui.label("Crimson does not bulk-download or force-install drivers. Incorrect drivers can disable Wi-Fi, graphics, audio, or startup.");
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add_enabled(
+                    !self.driver_running,
+                    egui::Button::new("Rescan Plug-and-Play devices"),
+                )
+                .clicked()
+            {
+                self.start_device_rescan();
+            }
+            if ui
+                .add_enabled(
+                    !self.driver_running,
+                    egui::Button::new("Start Windows Update detection"),
+                )
+                .clicked()
+            {
+                self.start_windows_update_detection();
+            }
+        });
         if ui.button("Open Windows optional driver updates").clicked() {
             self.driver_update_status = diagnostics::open_optional_driver_updates()
                 .unwrap_or_else(|error| format!("Could not open driver updates: {error}"));
@@ -1215,6 +1424,11 @@ impl eframe::App for CrimsonApp {
         self.collect_health_result();
         self.collect_driver_result();
         self.collect_update_result();
+        self.collect_emergency_scan();
+        if !self.emergency_running && self.last_emergency_scan.elapsed() >= EMERGENCY_SCAN_INTERVAL
+        {
+            self.start_emergency_scan();
+        }
         ctx.request_repaint_after(Duration::from_secs(1));
 
         let mut style = (*ctx.style()).clone();
@@ -1318,6 +1532,7 @@ impl eframe::App for CrimsonApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
+            self.emergency_banner(ui);
             ui.heading(self.page.label());
             ui.separator();
             egui::ScrollArea::vertical().show(ui, |ui| match self.page {
