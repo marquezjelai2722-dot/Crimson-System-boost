@@ -91,6 +91,7 @@ pub struct CrimsonApp {
     selected_tweaks: [bool; 7],
     selected_profile: &'static str,
     catalog_search: String,
+    catalog_page: usize,
     network_host: String,
     network_result: String,
     startup_result: String,
@@ -192,6 +193,7 @@ impl Default for CrimsonApp {
             selected_tweaks: [false; 7],
             selected_profile: "Custom",
             catalog_search: String::new(),
+            catalog_page: 0,
             network_host: "example.com".to_owned(),
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
                 .to_owned(),
@@ -855,6 +857,7 @@ impl CrimsonApp {
             ui.text_edit_singleline(&mut self.catalog_search);
             if ui.button("Clear").clicked() {
                 self.catalog_search.clear();
+                self.catalog_page = 0;
             }
         });
         let query = self.catalog_search.trim().to_ascii_lowercase();
@@ -878,8 +881,31 @@ impl CrimsonApp {
             .strong()
             .color(CRIMSON),
         );
+        const CATALOG_PAGE_SIZE: usize = 30;
+        let page_count = matching.len().div_ceil(CATALOG_PAGE_SIZE).max(1);
+        self.catalog_page = self.catalog_page.min(page_count - 1);
+        let start = self.catalog_page * CATALOG_PAGE_SIZE;
+        let end = (start + CATALOG_PAGE_SIZE).min(matching.len());
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(self.catalog_page > 0, egui::Button::new("Previous"))
+                .clicked()
+            {
+                self.catalog_page -= 1;
+            }
+            ui.label(format!("Page {} / {}", self.catalog_page + 1, page_count));
+            if ui
+                .add_enabled(self.catalog_page + 1 < page_count, egui::Button::new("Next"))
+                .clicked()
+            {
+                self.catalog_page += 1;
+            }
+            ui.label(format!("Showing {}–{} of {}", if matching.is_empty() { 0 } else { start + 1 }, end, matching.len()));
+        });
+        let start = self.catalog_page * CATALOG_PAGE_SIZE;
+        let end = (start + CATALOG_PAGE_SIZE).min(matching.len());
         ui.columns(3, |columns| {
-            for (index, entry) in matching.iter().enumerate() {
+            for (index, entry) in matching[start..end].iter().enumerate() {
                 columns[index % 3].group(|ui| {
                     ui.label(
                         egui::RichText::new(format!("#{:03}  {}", entry.id, entry.category))
