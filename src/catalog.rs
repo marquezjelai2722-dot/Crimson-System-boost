@@ -516,7 +516,9 @@ const ENTRIES: [CatalogEntry; 500] = [
 
 pub const CATALOG_COUNT: usize = ENTRIES.len();
 
-pub fn entries() -> Vec<CatalogEntry> {\n    ENTRIES.to_vec()\n}
+pub fn entries() -> Vec<CatalogEntry> {
+    ENTRIES.to_vec()
+}
 
 #[cfg(test)]
 mod tests {
