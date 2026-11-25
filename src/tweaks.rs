@@ -478,8 +478,10 @@ mod windows {
 
         #[test]
         fn consumed_apply_snapshot_is_archived_and_no_longer_matches_apply_filter() {
-            let directory = std::env::temp_dir()
-                .join(format!("crimson-snapshot-test-{}", timestamp().expect("timestamp")));
+            let directory = std::env::temp_dir().join(format!(
+                "crimson-snapshot-test-{}",
+                timestamp().expect("timestamp")
+            ));
             fs::create_dir_all(&directory).expect("create test directory");
             let original = directory.join("apply-test.snapshot");
             fs::write(&original, "test").expect("write test snapshot");
