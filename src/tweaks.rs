@@ -452,6 +452,49 @@ mod windows {
         ))
     }
 
+    fn mark_snapshot_consumed(path: &Path) -> Result<PathBuf, String> {
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| "Backup filename is invalid.".to_owned())?
+            .to_string_lossy();
+        let archived = path.with_file_name(format!("undone-{file_name}"));
+        if archived.exists() {
+            return Err(format!(
+                "The backup was already marked as used: {}",
+                archived.display()
+            ));
+        }
+        fs::rename(path, &archived).map_err(|error| {
+            format!(
+                "Settings were restored, but the backup could not be marked as used: {error}. Check the current settings before using Undo again."
+            )
+        })?;
+        Ok(archived)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn consumed_apply_snapshot_is_archived_and_no_longer_matches_apply_filter() {
+            let directory = std::env::temp_dir()
+                .join(format!("crimson-snapshot-test-{}", timestamp().expect("timestamp")));
+            fs::create_dir_all(&directory).expect("create test directory");
+            let original = directory.join("apply-test.snapshot");
+            fs::write(&original, "test").expect("write test snapshot");
+
+            let archived = mark_snapshot_consumed(&original).expect("archive snapshot");
+            assert!(!original.exists());
+            assert!(archived.exists());
+            assert!(archived
+                .file_name()
+                .is_some_and(|name| !name.to_string_lossy().starts_with("apply-")));
+
+            fs::remove_dir_all(directory).expect("remove test directory");
+        }
+    }
+
     pub fn undo_latest() -> Result<String, String> {
         verify_supported_windows()?;
         let directory = backup_dir()?;
@@ -491,9 +534,11 @@ mod windows {
             .map_err(|error| format!("Could not save the pre-undo snapshot: {error}"))?;
 
         restore_snapshot(&snapshot)?;
+        let archived_path = mark_snapshot_consumed(&path)?;
         Ok(format!(
-            "Restored the previous values from {}. A pre-undo snapshot was also saved. Some changes may require signing out or restarting Windows.",
-            path.display()
+            "Restored the previous values from {}. The used apply backup was archived as {} so Undo can move to the preceding operation next time. A pre-undo snapshot was also saved. Some changes may require signing out or restarting Windows.",
+            path.display(),
+            archived_path.display()
         ))
     }
 
