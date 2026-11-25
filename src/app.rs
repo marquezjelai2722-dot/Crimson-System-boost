@@ -848,8 +848,8 @@ impl CrimsonApp {
         });
         ui.add_space(18.0);
         ui.separator();
-        ui.heading("500-item optimization review catalog");
-        ui.label(egui::RichText::new("500 distinct subsystem reviews across gaming, graphics, Windows, storage, and networking. These are guided checks and recommendations—not 500 automatic tweaks. Only the seven individually tested settings above can currently be applied and rolled back.").color(MUTED));
+        ui.heading("500-item Windows action library");
+        ui.label(egui::RichText::new("500 uniquely named setting and maintenance targets across gaming, graphics, Windows, storage, and networking. Each has its own target and guidance; entries are not generic review-dimension duplicates. Important: this catalog is guidance-only for now. The seven individually tested settings above are the only entries currently wired to Apply and Undo.").color(MUTED));
         ui.horizontal(|ui| {
             ui.label("Search catalog");
             ui.text_edit_singleline(&mut self.catalog_search);
@@ -883,15 +883,15 @@ impl CrimsonApp {
                 columns[index % 3].group(|ui| {
                     ui.label(
                         egui::RichText::new(format!(
-                            "#{:03}  {} · {}",
-                            entry.id, entry.category, entry.subsystem
+                            "#{:03}  {}",
+                            entry.id, entry.category
                         ))
                         .strong(),
                     );
                     ui.label(egui::RichText::new(entry.review).color(CRIMSON).small());
                     ui.label(egui::RichText::new(entry.guidance).small().color(MUTED));
                     ui.label(
-                        egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED")
+                        egui::RichText::new("GUIDED TASK · NOT AUTO-APPLIED")
                             .small()
                             .color(MUTED),
                     );
