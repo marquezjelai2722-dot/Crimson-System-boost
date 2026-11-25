@@ -91,6 +91,7 @@ pub struct CrimsonApp {
     selected_tweaks: [bool; 7],
     selected_profile: &'static str,
     catalog_search: String,
+    catalog_last_query: String,
     catalog_page: usize,
     network_host: String,
     network_result: String,
@@ -193,6 +194,7 @@ impl Default for CrimsonApp {
             selected_tweaks: [false; 7],
             selected_profile: "Custom",
             catalog_search: String::new(),
+            catalog_last_query: String::new(),
             catalog_page: 0,
             network_host: "example.com".to_owned(),
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
@@ -861,6 +863,10 @@ impl CrimsonApp {
             }
         });
         let query = self.catalog_search.trim().to_ascii_lowercase();
+        if query != self.catalog_last_query {
+            self.catalog_page = 0;
+            self.catalog_last_query = query.clone();
+        }
         let entries = catalog::entries();
         let matching: Vec<_> = entries
             .iter()
