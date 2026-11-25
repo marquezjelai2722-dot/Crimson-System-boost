@@ -899,7 +899,10 @@ impl CrimsonApp {
             }
             ui.label(format!("Page {} / {}", self.catalog_page + 1, page_count));
             if ui
-                .add_enabled(self.catalog_page + 1 < page_count, egui::Button::new("Next"))
+                .add_enabled(
+                    self.catalog_page + 1 < page_count,
+                    egui::Button::new("Next"),
+                )
                 .clicked()
             {
                 self.catalog_page += 1;
