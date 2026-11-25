@@ -429,7 +429,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $headers = @{ 'User-Agent' = 'Crimson-System-Boost-Updater' }
 $releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/marquezjelai2722-dot/Crimson-System-boost/releases?per_page=20'
-$release = $releases | Where-Object { -not $_.draft } | Sort-Object published_at -Descending | Select-Object -First 1
+$release = $releases | Where-Object { -not $_.draft -and -not $_.prerelease } | Sort-Object published_at -Descending | Select-Object -First 1
 if ($null -eq $release) { throw 'No published GitHub release was found.' }
 $tag = [string]$release.tag_name
 if ($tag -notmatch '^v\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw 'The release tag has an invalid version format.' }
@@ -505,7 +505,7 @@ exit $LASTEXITCODE
 '@
 Set-Content -LiteralPath $scriptPath -Value $child -Encoding utf8
 try {
-    $arguments = '-NoProfile -File "' + $scriptPath + '" -LogPath "' + $logPath + '"'
+    $arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $scriptPath + '" -LogPath "' + $logPath + '"'
     $process = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru
     if (Test-Path -LiteralPath $logPath) {
         Get-Content -LiteralPath $logPath -Raw
