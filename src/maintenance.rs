@@ -2,11 +2,13 @@
 //! Driver packages are never deleted or replaced automatically. Updates are handed to
 //! Windows Update so the user can review applicable signed packages.
 
+#[cfg(windows)]
 use std::process::Command;
 
 #[derive(Clone, Debug, Default)]
 pub struct EmergencyReport {
     pub issues: Vec<String>,
+    pub notes: Vec<String>,
     pub summary: String,
 }
 
@@ -73,6 +75,12 @@ try {
 } catch {
     # An unavailable or empty event log is not itself evidence of a broken updater.
 }
+try {
+    $os = Get-CimInstance -ClassName Win32_OperatingSystem
+    if ([string]$os.Caption -match 'Windows 10') {
+        Write-Output 'NOTE|Windows 10 support ended on 14 October 2025. Security updates after that date require eligible Windows 10 ESU enrollment.'
+    }
+} catch { }
 if ($issues.Count -eq 0) {
     Write-Output 'OK|No recent Windows Update error events or Plug-and-Play device error codes were detected.'
 } else {
@@ -81,12 +89,15 @@ if ($issues.Count -eq 0) {
 "#;
     let output = run_powershell(script)?;
     let mut issues = Vec::new();
+    let mut notes = Vec::new();
     let mut warnings = Vec::new();
     let mut summary = String::new();
 
     for line in output.lines() {
         if let Some(issue) = line.strip_prefix("ISSUE|") {
             issues.push(issue.trim().to_owned());
+        } else if let Some(note) = line.strip_prefix("NOTE|") {
+            notes.push(note.trim().to_owned());
         } else if let Some(warning) = line.strip_prefix("CHECK_WARNING|") {
             warnings.push(warning.trim().to_owned());
         } else if let Some(ok) = line.strip_prefix("OK|") {
@@ -101,7 +112,7 @@ if ($issues.Count -eq 0) {
     if summary.is_empty() && issues.is_empty() {
         summary = "The emergency scan completed, but Windows returned no recognizable status.".to_owned();
     }
-    Ok(EmergencyReport { issues, summary })
+    Ok(EmergencyReport { issues, notes, summary })
 }
 
 #[cfg(not(windows))]
@@ -154,10 +165,12 @@ mod tests {
     fn report_only_flags_nonempty_issue_list() {
         let clean = EmergencyReport {
             issues: Vec::new(),
+            notes: Vec::new(),
             summary: "No issues".to_owned(),
         };
         let urgent = EmergencyReport {
             issues: vec!["A device reports a problem code".to_owned()],
+            notes: Vec::new(),
             summary: String::new(),
         };
         assert!(!clean.has_urgent_issues());
