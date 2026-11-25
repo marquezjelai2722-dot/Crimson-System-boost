@@ -553,7 +553,7 @@ impl CrimsonApp {
                             .strong()
                             .size(16.0),
                     );
-                    ui.label("Crimson detected recent Windows Update failures or devices reporting a Plug-and-Play problem code. Review the findings before repairing.");
+                    ui.label("Crimson detected devices reporting a Plug-and-Play problem code. Recent Windows Update error events are listed as warnings separately because an old error event does not prove that updating is still broken.");
                     for issue in report.issues.iter().take(6) {
                         ui.label(
                             egui::RichText::new(format!("• {issue}"))
