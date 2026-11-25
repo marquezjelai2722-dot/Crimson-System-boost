@@ -601,8 +601,8 @@ impl CrimsonApp {
                         self.start_device_rescan();
                     }
                     if ui.button("Open driver updates").clicked() {
-                        self.driver_update_status =
-                            diagnostics::open_optional_driver_updates().unwrap_or_else(|error| {
+                        self.driver_update_status = diagnostics::open_optional_driver_updates()
+                            .unwrap_or_else(|error| {
                                 format!("Could not open driver updates: {error}")
                             });
                     }
