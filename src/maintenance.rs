@@ -62,7 +62,11 @@ try {
     foreach ($device in $devices) {
         $name = ([string]$device.Name) -replace '[\r\n|]+', ' '
         $code = [int]$device.ConfigManagerErrorCode
-        $issues += ('ISSUE|Device problem code {0}: {1}' -f $code, $name)
+        if ($code -in @(22, 24, 45)) {
+            $notes += ('NOTE|Device is disabled or not currently connected (problem code {0}): {1}' -f $code, $name)
+        } else {
+            $issues += ('ISSUE|Device problem code {0}: {1}' -f $code, $name)
+        }
     }
 } catch {
     Write-Output ('CHECK_WARNING|Could not inspect Plug-and-Play devices: ' + $_.Exception.Message)
@@ -184,7 +188,8 @@ mod tests {
         let clean = EmergencyReport {
             issues: Vec::new(),
             notes: Vec::new(),
-            summary: "No issues".to_owned(),
+            summary: "No urgent device issues".to_owned(),
+            notes: vec!["A recent update error was recorded, but it is not confirmed unresolved.".to_owned()],
         };
         let urgent = EmergencyReport {
             issues: vec!["A device reports a problem code".to_owned()],
