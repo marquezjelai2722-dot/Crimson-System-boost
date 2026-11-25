@@ -407,7 +407,8 @@ impl CrimsonApp {
         }
         self.emergency_running = true;
         self.last_emergency_scan = Instant::now();
-        self.emergency_status = "Checking recent Windows Update failures and device errors…".to_owned();
+        self.emergency_status =
+            "Checking recent Windows Update failures and device errors…".to_owned();
         let sender = self.emergency_tx.clone();
         thread::spawn(move || {
             let result = maintenance::scan_emergency_conditions();
@@ -533,7 +534,11 @@ impl CrimsonApp {
         if self.emergency_running {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label(egui::RichText::new(&self.emergency_status).small().color(MUTED));
+                ui.label(
+                    egui::RichText::new(&self.emergency_status)
+                        .small()
+                        .color(MUTED),
+                );
             });
             return;
         }
@@ -542,31 +547,64 @@ impl CrimsonApp {
         if let Some(report) = report {
             if report.has_urgent_issues() {
                 ui.group(|ui| {
-                    ui.colored_label(egui::Color32::RED, egui::RichText::new("EMERGENCY REPAIR PRIORITY").strong().size(16.0));
+                    ui.colored_label(
+                        egui::Color32::RED,
+                        egui::RichText::new("EMERGENCY REPAIR PRIORITY")
+                            .strong()
+                            .size(16.0),
+                    );
                     ui.label("Crimson detected recent Windows Update failures or devices reporting a Plug-and-Play problem code. Review the findings before repairing.");
                     for issue in report.issues.iter().take(6) {
-                        ui.label(egui::RichText::new(format!("• {issue}")).color(egui::Color32::LIGHT_RED));
+                        ui.label(
+                            egui::RichText::new(format!("• {issue}"))
+                                .color(egui::Color32::LIGHT_RED),
+                        );
                     }
                     if report.issues.len() > 6 {
-                        ui.label(format!("And {} more findings. Open System health for the full scan status.", report.issues.len() - 6));
+                        ui.label(format!(
+                            "And {} more findings. Open System health for the full scan status.",
+                            report.issues.len() - 6
+                        ));
                     }
-                    ui.checkbox(&mut self.confirm_emergency_repair, "I saved my work and want to run Windows component repair (DISM + SFC).");
+                    ui.checkbox(
+                        &mut self.confirm_emergency_repair,
+                        "I saved my work and want to run Windows component repair (DISM + SFC).",
+                    );
                 });
                 ui.horizontal_wrapped(|ui| {
-                    if ui.add_enabled(self.confirm_emergency_repair && !self.health_running, egui::Button::new("Repair Windows files")).clicked() {
-                        self.health_result = diagnostics::launch_system_repair()
-                            .unwrap_or_else(|error| format!("Could not start Windows repair: {error}"));
+                    if ui
+                        .add_enabled(
+                            self.confirm_emergency_repair && !self.health_running,
+                            egui::Button::new("Repair Windows files"),
+                        )
+                        .clicked()
+                    {
+                        self.health_result =
+                            diagnostics::launch_system_repair().unwrap_or_else(|error| {
+                                format!("Could not start Windows repair: {error}")
+                            });
                         self.confirm_emergency_repair = false;
                     }
-                    if ui.add_enabled(!self.driver_running, egui::Button::new("Start Windows Update scan")).clicked() {
+                    if ui
+                        .add_enabled(
+                            !self.driver_running,
+                            egui::Button::new("Start Windows Update scan"),
+                        )
+                        .clicked()
+                    {
                         self.start_windows_update_detection();
                     }
-                    if ui.add_enabled(!self.driver_running, egui::Button::new("Rescan devices")).clicked() {
+                    if ui
+                        .add_enabled(!self.driver_running, egui::Button::new("Rescan devices"))
+                        .clicked()
+                    {
                         self.start_device_rescan();
                     }
                     if ui.button("Open driver updates").clicked() {
-                        self.driver_update_status = diagnostics::open_optional_driver_updates()
-                            .unwrap_or_else(|error| format!("Could not open driver updates: {error}"));
+                        self.driver_update_status =
+                            diagnostics::open_optional_driver_updates().unwrap_or_else(|error| {
+                                format!("Could not open driver updates: {error}")
+                            });
                     }
                     if ui.button("Recheck").clicked() {
                         self.start_emergency_scan();
@@ -579,7 +617,9 @@ impl CrimsonApp {
 
     fn health_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("Windows component health");
-        ui.label(egui::RichText::new(format!("Emergency scan: {}", self.emergency_status)).color(MUTED));
+        ui.label(
+            egui::RichText::new(format!("Emergency scan: {}", self.emergency_status)).color(MUTED),
+        );
         if let Some(report) = self.emergency_report.clone() {
             for note in report.notes {
                 ui.colored_label(MUTED, note);
@@ -600,7 +640,13 @@ impl CrimsonApp {
         ui.label(egui::RichText::new(&self.health_result).monospace());
         ui.label("If corruption is detected, review the output and back up important files before attempting Windows repair.");
         ui.horizontal_wrapped(|ui| {
-            if ui.add_enabled(!self.driver_running, egui::Button::new("Request Windows Update detection")).clicked() {
+            if ui
+                .add_enabled(
+                    !self.driver_running,
+                    egui::Button::new("Request Windows Update detection"),
+                )
+                .clicked()
+            {
                 self.start_windows_update_detection();
             }
             if ui.button("Recheck emergency conditions").clicked() {
@@ -650,10 +696,22 @@ impl CrimsonApp {
         ui.label("Safe update path: Windows Update → Advanced options → Optional updates → Driver updates, or the Samsung / Intel support page for the exact device model.");
         ui.label("Crimson does not bulk-download or force-install drivers. Incorrect drivers can disable Wi-Fi, graphics, audio, or startup.");
         ui.horizontal_wrapped(|ui| {
-            if ui.add_enabled(!self.driver_running, egui::Button::new("Rescan Plug-and-Play devices")).clicked() {
+            if ui
+                .add_enabled(
+                    !self.driver_running,
+                    egui::Button::new("Rescan Plug-and-Play devices"),
+                )
+                .clicked()
+            {
                 self.start_device_rescan();
             }
-            if ui.add_enabled(!self.driver_running, egui::Button::new("Start Windows Update detection")).clicked() {
+            if ui
+                .add_enabled(
+                    !self.driver_running,
+                    egui::Button::new("Start Windows Update detection"),
+                )
+                .clicked()
+            {
                 self.start_windows_update_detection();
             }
         });
@@ -1367,7 +1425,8 @@ impl eframe::App for CrimsonApp {
         self.collect_driver_result();
         self.collect_update_result();
         self.collect_emergency_scan();
-        if !self.emergency_running && self.last_emergency_scan.elapsed() >= EMERGENCY_SCAN_INTERVAL {
+        if !self.emergency_running && self.last_emergency_scan.elapsed() >= EMERGENCY_SCAN_INTERVAL
+        {
             self.start_emergency_scan();
         }
         ctx.request_repaint_after(Duration::from_secs(1));
