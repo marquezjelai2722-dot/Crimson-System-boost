@@ -519,7 +519,6 @@ mod windows {
             .pop()
             .ok_or_else(|| "No Crimson optimization backup was found.".to_owned())?;
 
-        create_restore_point()?;
         let snapshot = fs::read_to_string(&path)
             .map_err(|error| format!("Could not read the settings backup: {error}"))?;
         let ids = snapshot
