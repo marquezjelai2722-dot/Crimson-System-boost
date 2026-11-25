@@ -539,7 +539,11 @@ mod tests {
     #[test]
     fn each_target_has_specific_nonempty_guidance() {
         assert!(ENTRIES.iter().all(|entry| !entry.subsystem.is_empty()));
-        assert!(ENTRIES.iter().all(|entry| entry.review.contains(entry.subsystem)));
-        assert!(ENTRIES.iter().all(|entry| entry.guidance.contains(entry.subsystem)));
+        assert!(ENTRIES
+            .iter()
+            .all(|entry| entry.review.contains(entry.subsystem)));
+        assert!(ENTRIES
+            .iter()
+            .all(|entry| entry.guidance.contains(entry.subsystem)));
     }
 }
