@@ -21,7 +21,13 @@ impl EmergencyReport {
 #[cfg(windows)]
 fn run_powershell(script: &str) -> Result<String, String> {
     let output = Command::new("powershell.exe")
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script])
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ])
         .output()
         .map_err(|error| format!("Could not start Windows maintenance check: {error}"))?;
 
@@ -110,12 +116,20 @@ if ($issues.Count -eq 0) {
         summary.push_str(&warnings.join("\n"));
     }
     if summary.is_empty() && !issues.is_empty() {
-        summary = format!("Detected {} urgent Windows Update or device issue(s).", issues.len());
+        summary = format!(
+            "Detected {} urgent Windows Update or device issue(s).",
+            issues.len()
+        );
     }
     if summary.is_empty() && issues.is_empty() {
-        summary = "The emergency scan completed, but Windows returned no recognizable status.".to_owned();
+        summary =
+            "The emergency scan completed, but Windows returned no recognizable status.".to_owned();
     }
-    Ok(EmergencyReport { issues, notes, summary })
+    Ok(EmergencyReport {
+        issues,
+        notes,
+        summary,
+    })
 }
 
 #[cfg(not(windows))]
