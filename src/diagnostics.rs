@@ -495,16 +495,18 @@ pub fn system_health_scan() -> Result<String, String> {
     // EncodedCommand instead; TEMP is used only for diagnostic output.
     let script = r#"
 $ErrorActionPreference = 'Stop'
-$logPath = Join-Path $env:TEMP ('CrimsonHealth-' + [guid]::NewGuid().ToString('N') + '.log')
+$logToken = [guid]::NewGuid().ToString('N')
+$logPath = Join-Path $env:TEMP ('CrimsonHealth-' + $logToken + '.log')
 $child = @'
-param([string]$LogPath)
 $ErrorActionPreference = 'Continue'
-& DISM.exe /Online /Cleanup-Image /ScanHealth *>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+$logPath = Join-Path $env:TEMP 'CrimsonHealth-__LOG_TOKEN__.log'
+& DISM.exe /Online /Cleanup-Image /ScanHealth *>&1 | Out-File -LiteralPath $logPath -Append -Encoding utf8
 $dismCode = $LASTEXITCODE
 if ($dismCode -ne 0) { exit $dismCode }
-& sfc.exe /verifyonly *>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+& sfc.exe /verifyonly *>&1 | Out-File -LiteralPath $logPath -Append -Encoding utf8
 exit $LASTEXITCODE
 '@
+$child = $child.Replace('__LOG_TOKEN__', $logToken)
 $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child))
 try {
     $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded)
