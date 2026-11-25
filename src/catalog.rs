@@ -10,7 +10,7 @@ pub struct CatalogEntry {
     pub guidance: &'static str,
 }
 
-const ENTRIES: [CatalogEntry; 500] = [
+static ENTRIES: [CatalogEntry; 500] = [
     CatalogEntry { id: 1, category: "Gaming", subsystem: "Xbox Game Bar capture", review: "Xbox Game Bar capture — Background capture toggle", guidance: "Inspect background capture toggle for Xbox Game Bar capture. Record the current state, check Windows or the device manufacturer's supported interface for compatibility and policy overrides, and verify the result after any user-approved change. This task is read-only unless a separate supported action is explicitly offered." },
     CatalogEntry { id: 2, category: "Gaming", subsystem: "Xbox Game Bar capture", review: "Xbox Game Bar capture — Manual recording permission", guidance: "Inspect manual recording permission for Xbox Game Bar capture. Record the current state, check Windows or the device manufacturer's supported interface for compatibility and policy overrides, and verify the result after any user-approved change. This task is read-only unless a separate supported action is explicitly offered." },
     CatalogEntry { id: 3, category: "Gaming", subsystem: "Xbox Game Bar capture", review: "Xbox Game Bar capture — Capture shortcut binding", guidance: "Inspect capture shortcut binding for Xbox Game Bar capture. Record the current state, check Windows or the device manufacturer's supported interface for compatibility and policy overrides, and verify the result after any user-approved change. This task is read-only unless a separate supported action is explicitly offered." },
