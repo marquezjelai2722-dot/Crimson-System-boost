@@ -589,11 +589,7 @@ impl CrimsonApp {
         ui.add_space(14.0);
         ui.columns(3, |columns| {
             columns[0].vertical(|ui| {
-                tweak_category_header(
-                    ui,
-                    "GAMING",
-                    "Game capture and Windows game scheduling",
-                );
+                tweak_category_header(ui, "GAMING", "Game capture and Windows game scheduling");
                 tweak_card(
                     ui,
                     &mut self.selected_tweaks,
@@ -654,21 +650,42 @@ impl CrimsonApp {
         });
         let query = self.catalog_search.trim().to_ascii_lowercase();
         let entries = catalog::entries();
-        let matching: Vec<_> = entries.iter().filter(|entry| {
-            query.is_empty()
-                || entry.subsystem.to_ascii_lowercase().contains(&query)
-                || entry.category.to_ascii_lowercase().contains(&query)
-                || entry.review.to_ascii_lowercase().contains(&query)
-                || entry.guidance.to_ascii_lowercase().contains(&query)
-        }).collect();
-        ui.label(egui::RichText::new(format!("{} / {} catalog entries", matching.len(), catalog::CATALOG_COUNT)).strong().color(CRIMSON));
+        let matching: Vec<_> = entries
+            .iter()
+            .filter(|entry| {
+                query.is_empty()
+                    || entry.subsystem.to_ascii_lowercase().contains(&query)
+                    || entry.category.to_ascii_lowercase().contains(&query)
+                    || entry.review.to_ascii_lowercase().contains(&query)
+                    || entry.guidance.to_ascii_lowercase().contains(&query)
+            })
+            .collect();
+        ui.label(
+            egui::RichText::new(format!(
+                "{} / {} catalog entries",
+                matching.len(),
+                catalog::CATALOG_COUNT
+            ))
+            .strong()
+            .color(CRIMSON),
+        );
         ui.columns(3, |columns| {
             for (index, entry) in matching.iter().enumerate() {
                 columns[index % 3].group(|ui| {
-                    ui.label(egui::RichText::new(format!("#{:03}  {} · {}", entry.id, entry.category, entry.subsystem)).strong());
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "#{:03}  {} · {}",
+                            entry.id, entry.category, entry.subsystem
+                        ))
+                        .strong(),
+                    );
                     ui.label(egui::RichText::new(entry.review).color(CRIMSON).small());
                     ui.label(egui::RichText::new(entry.guidance).small().color(MUTED));
-                    ui.label(egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED").small().color(MUTED));
+                    ui.label(
+                        egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED")
+                            .small()
+                            .color(MUTED),
+                    );
                 });
             }
         });
