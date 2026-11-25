@@ -533,7 +533,17 @@ mod windows {
         fs::write(&undo_path, current.as_bytes())
             .map_err(|error| format!("Could not save the pre-undo snapshot: {error}"))?;
 
-        restore_snapshot(&snapshot)?;
+        if let Err(error) = restore_snapshot(&snapshot) {
+            return match restore_snapshot(&current) {
+                Ok(()) => Err(format!(
+                    "{error} The pre-undo settings were restored automatically."
+                )),
+                Err(rollback_error) => Err(format!(
+                    "{error} Automatic rollback also failed: {rollback_error}. Pre-undo backup: {}",
+                    undo_path.display()
+                )),
+            };
+        }
         let archived_path = mark_snapshot_consumed(&path)?;
         Ok(format!(
             "Restored the previous values from {}. The used apply backup was archived as {} so Undo can move to the preceding operation next time. A pre-undo snapshot was also saved. Some changes may require signing out or restarting Windows.",
