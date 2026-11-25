@@ -54,6 +54,7 @@ pub fn scan_emergency_conditions() -> Result<EmergencyReport, String> {
     let script = r#"
 $ErrorActionPreference = 'Stop'
 $issues = @()
+$notes = @()
 try {
     $devices = @(Get-CimInstance -ClassName Win32_PnPEntity |
         Where-Object { $null -ne $_.ConfigManagerErrorCode -and $_.ConfigManagerErrorCode -ne 0 } |
@@ -61,7 +62,11 @@ try {
     foreach ($device in $devices) {
         $name = ([string]$device.Name) -replace '[\r\n|]+', ' '
         $code = [int]$device.ConfigManagerErrorCode
-        $issues += ('ISSUE|Device problem code {0}: {1}' -f $code, $name)
+        if ($code -in @(22, 24, 45)) {
+            $notes += ('NOTE|Device is disabled or not currently connected (problem code {0}): {1}' -f $code, $name)
+        } else {
+            $issues += ('ISSUE|Device problem code {0}: {1}' -f $code, $name)
+        }
     }
 } catch {
     Write-Output ('CHECK_WARNING|Could not inspect Plug-and-Play devices: ' + $_.Exception.Message)
@@ -76,7 +81,7 @@ try {
     foreach ($event in $events) {
         $message = ([string]$event.Message -replace '[\r\n|]+', ' ')
         if ($message.Length -gt 220) { $message = $message.Substring(0, 220) }
-        $issues += ('ISSUE|Windows Update error event {0} ({1}): {2}' -f $event.Id, $event.TimeCreated, $message)
+        $notes += ('NOTE|Recent Windows Update error event {0} ({1}): {2}' -f $event.Id, $event.TimeCreated, $message)
     }
 } catch {
     # An unavailable or empty event log is not itself evidence of a broken updater.
@@ -88,10 +93,10 @@ try {
     }
 } catch { }
 if ($issues.Count -eq 0) {
-    Write-Output 'OK|No recent Windows Update error events or Plug-and-Play device error codes were detected.'
-} else {
-    $issues | ForEach-Object { Write-Output $_ }
+    Write-Output 'OK|No Plug-and-Play device error codes were detected.'
 }
+$issues | ForEach-Object { Write-Output $_ }
+$notes | ForEach-Object { Write-Output $_ }
 "#;
     let output = run_powershell(script)?;
     let mut issues = Vec::new();
@@ -117,7 +122,7 @@ if ($issues.Count -eq 0) {
     }
     if summary.is_empty() && !issues.is_empty() {
         summary = format!(
-            "Detected {} urgent Windows Update or device issue(s).",
+            "Detected {} device problem code(s) requiring review.",
             issues.len()
         );
     }
@@ -182,8 +187,11 @@ mod tests {
     fn report_only_flags_nonempty_issue_list() {
         let clean = EmergencyReport {
             issues: Vec::new(),
-            notes: Vec::new(),
-            summary: "No issues".to_owned(),
+            notes: vec![
+                "A recent update error was recorded, but it is not confirmed unresolved."
+                    .to_owned(),
+            ],
+            summary: "No urgent device issues".to_owned(),
         };
         let urgent = EmergencyReport {
             issues: vec!["A device reports a problem code".to_owned()],
