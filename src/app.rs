@@ -1,3 +1,5 @@
+#[path = "catalog.rs"]
+mod catalog;
 #[path = "diagnostics.rs"]
 mod diagnostics;
 #[path = "security.rs"]
@@ -84,6 +86,8 @@ pub struct CrimsonApp {
     optimization_running: bool,
     optimization_status: String,
     selected_tweaks: [bool; 7],
+    selected_profile: &'static str,
+    catalog_search: String,
     network_host: String,
     network_result: String,
     startup_result: String,
@@ -170,6 +174,8 @@ impl Default for CrimsonApp {
             optimization_running: false,
             optimization_status: "No optimization has been applied in this session.".to_owned(),
             selected_tweaks: [false; 7],
+            selected_profile: "Custom",
+            catalog_search: String::new(),
             network_host: "example.com".to_owned(),
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
                 .to_owned(),
@@ -508,6 +514,68 @@ impl CrimsonApp {
     }
 
     fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Choose your optimization profile");
+        ui.label(egui::RichText::new(
+            "Pick a starting selection, then review every tweak before applying. Profiles only select options; nothing changes until you press Apply.",
+        ).color(MUTED));
+        ui.add_space(8.0);
+
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .selectable_label(self.selected_profile == "Normal", "Normal")
+                .clicked()
+            {
+                self.selected_profile = "Normal";
+                self.selected_tweaks = [false, true, false, false, false, false, false];
+            }
+            if ui
+                .selectable_label(self.selected_profile == "Advanced", "Advanced")
+                .clicked()
+            {
+                self.selected_profile = "Advanced";
+                self.selected_tweaks = [true, true, true, true, true, false, false];
+            }
+            if ui
+                .selectable_label(
+                    self.selected_profile == "Max FPS for gaming",
+                    "Max FPS for gaming",
+                )
+                .clicked()
+            {
+                self.selected_profile = "Max FPS for gaming";
+                self.selected_tweaks = [true, true, true, true, false, false, false];
+            }
+            if ui
+                .selectable_label(
+                    self.selected_profile == "Everything safe",
+                    "Everything safe",
+                )
+                .clicked()
+            {
+                self.selected_profile = "Everything safe";
+                self.selected_tweaks = [true; 7];
+            }
+        });
+        ui.label(
+            egui::RichText::new(match self.selected_profile {
+                "Normal" => "A light baseline: Windows Game Mode only.",
+                "Advanced" => {
+                    "Selects the available gaming, visual, and consumer-experience tweaks."
+                }
+                "Max FPS for gaming" => {
+                    "Selects the available game-capture, Game Mode, and visual-effect options. No FPS gain is guaranteed."
+                }
+                "Everything safe" => {
+                    "Selects every currently available reversible tweak in this library."
+                }
+                _ => "Custom selection: choose individual tweaks below.",
+            })
+            .small()
+            .color(MUTED),
+        );
+        ui.add_space(12.0);
+
+        let selection_before_cards = self.selected_tweaks;
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.heading("Tweak library");
@@ -569,6 +637,61 @@ impl CrimsonApp {
                 );
             });
         });
+        ui.add_space(18.0);
+        ui.separator();
+        ui.heading("500-item optimization review catalog");
+        ui.label(egui::RichText::new("500 distinct subsystem reviews across gaming, graphics, Windows, storage, and networking. These are guided checks and recommendations—not 500 automatic tweaks. Only the seven individually tested settings above can currently be applied and rolled back.").color(MUTED));
+        ui.horizontal(|ui| {
+            ui.label("Search catalog");
+            ui.text_edit_singleline(&mut self.catalog_search);
+            if ui.button("Clear").clicked() {
+                self.catalog_search.clear();
+            }
+        });
+        let query = self.catalog_search.trim().to_ascii_lowercase();
+        let entries = catalog::entries();
+        let matching: Vec<_> = entries
+            .iter()
+            .filter(|entry| {
+                query.is_empty()
+                    || entry.subsystem.to_ascii_lowercase().contains(&query)
+                    || entry.category.to_ascii_lowercase().contains(&query)
+                    || entry.review.to_ascii_lowercase().contains(&query)
+                    || entry.guidance.to_ascii_lowercase().contains(&query)
+            })
+            .collect();
+        ui.label(
+            egui::RichText::new(format!(
+                "{} / {} catalog entries",
+                matching.len(),
+                catalog::CATALOG_COUNT
+            ))
+            .strong()
+            .color(CRIMSON),
+        );
+        ui.columns(3, |columns| {
+            for (index, entry) in matching.iter().enumerate() {
+                columns[index % 3].group(|ui| {
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "#{:03}  {} · {}",
+                            entry.id, entry.category, entry.subsystem
+                        ))
+                        .strong(),
+                    );
+                    ui.label(egui::RichText::new(entry.review).color(CRIMSON).small());
+                    ui.label(egui::RichText::new(entry.guidance).small().color(MUTED));
+                    ui.label(
+                        egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED")
+                            .small()
+                            .color(MUTED),
+                    );
+                });
+            }
+        });
+        if self.selected_tweaks != selection_before_cards {
+            self.selected_profile = "Custom";
+        }
         ui.add_space(12.0);
         ui.separator();
         ui.horizontal_wrapped(|ui| {
@@ -585,6 +708,7 @@ impl CrimsonApp {
             }
             if clear {
                 self.selected_tweaks = [false; 7];
+                self.selected_profile = "Custom";
             }
             if ui.button("Undo last batch").clicked() && !self.optimization_running {
                 self.undo_latest_optimization();
