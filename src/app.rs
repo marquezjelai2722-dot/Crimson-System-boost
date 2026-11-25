@@ -1,3 +1,5 @@
+#[path = "catalog.rs"]
+mod catalog;
 #[path = "diagnostics.rs"]
 mod diagnostics;
 #[path = "security.rs"]
@@ -85,6 +87,7 @@ pub struct CrimsonApp {
     optimization_status: String,
     selected_tweaks: [bool; 7],
     selected_profile: &'static str,
+    catalog_search: String,
     network_host: String,
     network_result: String,
     startup_result: String,
@@ -172,6 +175,7 @@ impl Default for CrimsonApp {
             optimization_status: "No optimization has been applied in this session.".to_owned(),
             selected_tweaks: [false; 7],
             selected_profile: "Custom",
+            catalog_search: String::new(),
             network_host: "example.com".to_owned(),
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
                 .to_owned(),
@@ -636,6 +640,37 @@ impl CrimsonApp {
                     tweaks::TweakId::DisableConsumerFeatures,
                 );
             });
+        });
+        ui.add_space(18.0);
+        ui.separator();
+        ui.heading("500-item optimization review catalog");
+        ui.label(egui::RichText::new("500 distinct subsystem reviews across gaming, graphics, Windows, storage, and networking. These are guided checks and recommendations—not 500 automatic tweaks. Only the seven individually tested settings above can currently be applied and rolled back.").color(MUTED));
+        ui.horizontal(|ui| {
+            ui.label("Search catalog");
+            ui.text_edit_singleline(&mut self.catalog_search);
+            if ui.button("Clear").clicked() {
+                self.catalog_search.clear();
+            }
+        });
+        let query = self.catalog_search.trim().to_ascii_lowercase();
+        let entries = catalog::entries();
+        let matching: Vec<_> = entries.iter().filter(|entry| {
+            query.is_empty()
+                || entry.subsystem.to_ascii_lowercase().contains(&query)
+                || entry.category.to_ascii_lowercase().contains(&query)
+                || entry.review.to_ascii_lowercase().contains(&query)
+                || entry.guidance.to_ascii_lowercase().contains(&query)
+        }).collect();
+        ui.label(egui::RichText::new(format!("{} / {} catalog entries", matching.len(), catalog::CATALOG_COUNT)).strong().color(CRIMSON));
+        ui.columns(3, |columns| {
+            for (index, entry) in matching.iter().enumerate() {
+                columns[index % 3].group(|ui| {
+                    ui.label(egui::RichText::new(format!("#{:03}  {} · {}", entry.id, entry.category, entry.subsystem)).strong());
+                    ui.label(egui::RichText::new(entry.review).color(CRIMSON).small());
+                    ui.label(egui::RichText::new(entry.guidance).small().color(MUTED));
+                    ui.label(egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED").small().color(MUTED));
+                });
+            }
         });
         if self.selected_tweaks != selection_before_cards {
             self.selected_profile = "Custom";
