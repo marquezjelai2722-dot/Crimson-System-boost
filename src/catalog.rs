@@ -515,8 +515,8 @@ static ENTRIES: [CatalogEntry; 500] = [
 
 pub const CATALOG_COUNT: usize = 500;
 
-pub fn entries() -> Vec<CatalogEntry> {
-    ENTRIES.to_vec()
+pub fn entries() -> &'static [CatalogEntry] {
+    &ENTRIES
 }
 
 #[cfg(test)]
