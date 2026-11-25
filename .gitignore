@@ -49,3 +49,37 @@ Desktop.ini
 *.msix
 *.appx
 *.zip
+
+# Private / classified local material (never commit these)
+.env
+.env.*
+!.env.example
+*.secret
+*.secrets
+*.token
+*.credentials
+credentials.json
+secrets.json
+secrets.local.json
+/private/
+/classified/
+/credentials/
+/.local-secrets/
+.ssh/
+.aws/
+.azure/
+.config/gcloud/
+id_rsa
+id_ed25519
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local diagnostics and user data
+*.crash
+*.core
+*.bak
+*.backup
+*.orig
+*.rej
