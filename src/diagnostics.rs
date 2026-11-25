@@ -490,9 +490,11 @@ pub fn download_verified_update(_current_version: &str) -> Result<Option<PathBuf
 /// Runs non-repairing Windows image and protected-file checks with explicit UAC elevation.
 #[cfg(windows)]
 pub fn system_health_scan() -> Result<String, String> {
+    // Never execute a PowerShell script stored in the user-writable TEMP directory
+    // with administrator privileges. Pass the fixed child script as UTF-16
+    // EncodedCommand instead; TEMP is used only for diagnostic output.
     let script = r#"
 $ErrorActionPreference = 'Stop'
-$scriptPath = Join-Path $env:TEMP ('CrimsonHealth-' + [guid]::NewGuid().ToString('N') + '.ps1')
 $logPath = Join-Path $env:TEMP ('CrimsonHealth-' + [guid]::NewGuid().ToString('N') + '.log')
 $child = @'
 param([string]$LogPath)
@@ -503,16 +505,17 @@ if ($dismCode -ne 0) { exit $dismCode }
 & sfc.exe /verifyonly *>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
 exit $LASTEXITCODE
 '@
-Set-Content -LiteralPath $scriptPath -Value $child -Encoding utf8
+$encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child))
 try {
-    $arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $scriptPath + '" -LogPath "' + $logPath + '"'
+    $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded)
     $process = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru
     if (Test-Path -LiteralPath $logPath) {
         Get-Content -LiteralPath $logPath -Raw
+    } else {
+        Write-Output 'The elevated health scan completed without a readable log file.'
     }
     if ($process.ExitCode -ne 0) { exit $process.ExitCode }
 } finally {
-    Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
 }
 "#;
