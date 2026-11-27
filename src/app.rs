@@ -853,8 +853,16 @@ impl CrimsonApp {
                     );
                 });
                 columns[2].vertical(|ui| {
-                    tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableWindowsTips);
-                    tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableConsumerFeatures);
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::DisableWindowsTips,
+                    );
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::DisableConsumerFeatures,
+                    );
                 });
             });
         });
@@ -879,9 +887,11 @@ impl CrimsonApp {
                 .color(MUTED),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.catalog_search)
-                    .hint_text("Search tweaks, subsystems, or guidance…")
-                    .desired_width(250.0));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.catalog_search)
+                        .hint_text("Search tweaks, subsystems, or guidance…")
+                        .desired_width(250.0),
+                );
             });
         });
 
