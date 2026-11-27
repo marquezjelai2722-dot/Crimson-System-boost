@@ -732,7 +732,12 @@ impl CrimsonApp {
 
     fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
         let entries = catalog::entries();
-        let cpu = self.system.cpus().iter().map(|core| core.cpu_usage()).sum::<f32>()
+        let cpu = self
+            .system
+            .cpus()
+            .iter()
+            .map(|core| core.cpu_usage())
+            .sum::<f32>()
             / self.system.cpus().len().max(1) as f32;
         let total_memory = self.system.total_memory();
         let used_memory = self.system.used_memory();
@@ -744,12 +749,23 @@ impl CrimsonApp {
 
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
-                ui.heading(egui::RichText::new("TWEAKS").strong().color(CRIMSON).size(25.0));
-                ui.label(egui::RichText::new("Browse, review, and apply supported Windows changes.")
-                    .color(MUTED));
+                ui.heading(
+                    egui::RichText::new("TWEAKS")
+                        .strong()
+                        .color(CRIMSON)
+                        .size(25.0),
+                );
+                ui.label(
+                    egui::RichText::new("Browse, review, and apply supported Windows changes.")
+                        .color(MUTED),
+                );
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(egui::RichText::new("500 GUIDED ACTIONS").strong().color(CRIMSON));
+                ui.label(
+                    egui::RichText::new("500 GUIDED ACTIONS")
+                        .strong()
+                        .color(CRIMSON),
+                );
             });
         });
         ui.add_space(10.0);
@@ -783,7 +799,10 @@ impl CrimsonApp {
                 ("Max FPS", [true, true, true, true, false, false, false]),
                 ("Everything Safe", [true; 7]),
             ] {
-                if ui.selectable_label(self.selected_profile == name, name).clicked() {
+                if ui
+                    .selectable_label(self.selected_profile == name, name)
+                    .clicked()
+                {
                     self.selected_profile = name;
                     self.selected_tweaks = selection;
                 }
@@ -794,19 +813,44 @@ impl CrimsonApp {
         let selection_before_cards = self.selected_tweaks;
         ui.group(|ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("READY-TO-APPLY TWEAKS").strong().color(CRIMSON));
-                ui.label(egui::RichText::new("Only these seven tested actions are currently executable.")
-                    .small().color(MUTED));
+                ui.label(
+                    egui::RichText::new("READY-TO-APPLY TWEAKS")
+                        .strong()
+                        .color(CRIMSON),
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "Only these seven tested actions are currently executable.",
+                    )
+                    .small()
+                    .color(MUTED),
+                );
             });
             ui.columns(3, |columns| {
                 columns[0].vertical(|ui| {
-                    tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameCaptureOff);
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::GameCaptureOff,
+                    );
                     tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameModeOn);
-                    tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::TransparencyOff);
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::TransparencyOff,
+                    );
                 });
                 columns[1].vertical(|ui| {
-                    tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::VisualEffectsPerformance);
-                    tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableAppSuggestions);
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::VisualEffectsPerformance,
+                    );
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::DisableAppSuggestions,
+                    );
                 });
                 columns[2].vertical(|ui| {
                     tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::DisableWindowsTips);
@@ -820,9 +864,20 @@ impl CrimsonApp {
 
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("BROWSE ACTIONS").strong().color(CRIMSON));
-            ui.label(egui::RichText::new(format!("{} / {} entries", entries.len(), catalog::CATALOG_COUNT))
-                .small().color(MUTED));
+            ui.label(
+                egui::RichText::new("BROWSE ACTIONS")
+                    .strong()
+                    .color(CRIMSON),
+            );
+            ui.label(
+                egui::RichText::new(format!(
+                    "{} / {} entries",
+                    entries.len(),
+                    catalog::CATALOG_COUNT
+                ))
+                .small()
+                .color(MUTED),
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add(egui::TextEdit::singleline(&mut self.catalog_search)
                     .hint_text("Search tweaks, subsystems, or guidance…")
@@ -835,14 +890,17 @@ impl CrimsonApp {
             self.catalog_page = 0;
             self.catalog_last_query = query.clone();
         }
-        let matching: Vec<_> = entries.iter().filter(|entry| {
-            (self.catalog_category == "All" || entry.category == self.catalog_category)
-                && (query.is_empty()
-                    || entry.subsystem.to_ascii_lowercase().contains(&query)
-                    || entry.category.to_ascii_lowercase().contains(&query)
-                    || entry.review.to_ascii_lowercase().contains(&query)
-                    || entry.guidance.to_ascii_lowercase().contains(&query))
-        }).collect();
+        let matching: Vec<_> = entries
+            .iter()
+            .filter(|entry| {
+                (self.catalog_category == "All" || entry.category == self.catalog_category)
+                    && (query.is_empty()
+                        || entry.subsystem.to_ascii_lowercase().contains(&query)
+                        || entry.category.to_ascii_lowercase().contains(&query)
+                        || entry.review.to_ascii_lowercase().contains(&query)
+                        || entry.guidance.to_ascii_lowercase().contains(&query))
+            })
+            .collect();
 
         ui.add_space(8.0);
         ui.columns(3, |columns| {
@@ -854,10 +912,16 @@ impl CrimsonApp {
                     let count = if category == "All" {
                         entries.len()
                     } else {
-                        entries.iter().filter(|entry| entry.category == category).count()
+                        entries
+                            .iter()
+                            .filter(|entry| entry.category == category)
+                            .count()
                     };
                     let label = format!("{category}  ({count})");
-                    if ui.selectable_label(self.catalog_category == category, label).clicked() {
+                    if ui
+                        .selectable_label(self.catalog_category == category, label)
+                        .clicked()
+                    {
                         self.catalog_category = category.to_owned();
                         self.catalog_page = 0;
                     }
@@ -881,44 +945,69 @@ impl CrimsonApp {
                 let page_count = matching.len().div_ceil(PAGE_SIZE).max(1);
                 self.catalog_page = self.catalog_page.min(page_count - 1);
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(self.catalog_page > 0, egui::Button::new("‹")).clicked() {
+                    if ui
+                        .add_enabled(self.catalog_page > 0, egui::Button::new("‹"))
+                        .clicked()
+                    {
                         self.catalog_page -= 1;
                     }
                     ui.label(format!("Page {} / {}", self.catalog_page + 1, page_count));
-                    if ui.add_enabled(self.catalog_page + 1 < page_count, egui::Button::new("›")).clicked() {
+                    if ui
+                        .add_enabled(self.catalog_page + 1 < page_count, egui::Button::new("›"))
+                        .clicked()
+                    {
                         self.catalog_page += 1;
                     }
                 });
                 let start = self.catalog_page * PAGE_SIZE;
                 let end = (start + PAGE_SIZE).min(matching.len());
-                egui::ScrollArea::vertical().max_height(340.0).show(ui, |ui| {
-                    if matching.is_empty() {
-                        ui.label("No matching actions. Try another search.");
-                    }
-                    for entry in &matching[start..end] {
-                        let selected = self.selected_catalog_id == entry.id;
-                        let response = ui.add_sized(
-                            [ui.available_width(), 48.0],
-                            egui::Button::new(
-                                egui::RichText::new(format!("{}  {}", entry.category, entry.review))
-                                    .size(12.0)
-                            ).selected(selected),
-                        );
-                        if response.clicked() {
-                            self.selected_catalog_id = entry.id;
+                egui::ScrollArea::vertical()
+                    .max_height(340.0)
+                    .show(ui, |ui| {
+                        if matching.is_empty() {
+                            ui.label("No matching actions. Try another search.");
                         }
-                        ui.label(egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED")
-                            .small().color(MUTED));
-                    }
-                });
+                        for entry in &matching[start..end] {
+                            let selected = self.selected_catalog_id == entry.id;
+                            let response = ui.add_sized(
+                                [ui.available_width(), 48.0],
+                                egui::Button::new(
+                                    egui::RichText::new(format!(
+                                        "{}  {}",
+                                        entry.category, entry.review
+                                    ))
+                                    .size(12.0),
+                                )
+                                .selected(selected),
+                            );
+                            if response.clicked() {
+                                self.selected_catalog_id = entry.id;
+                            }
+                            ui.label(
+                                egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED")
+                                    .small()
+                                    .color(MUTED),
+                            );
+                        }
+                    });
             });
 
             columns[2].group(|ui| {
                 ui.set_min_height(430.0);
-                ui.label(egui::RichText::new("ACTION DETAILS").strong().color(CRIMSON));
-                if let Some(entry) = entries.iter().find(|entry| entry.id == self.selected_catalog_id) {
-                    ui.label(egui::RichText::new(format!("#{:03} · {}", entry.id, entry.category))
-                        .small().color(MUTED));
+                ui.label(
+                    egui::RichText::new("ACTION DETAILS")
+                        .strong()
+                        .color(CRIMSON),
+                );
+                if let Some(entry) = entries
+                    .iter()
+                    .find(|entry| entry.id == self.selected_catalog_id)
+                {
+                    ui.label(
+                        egui::RichText::new(format!("#{:03} · {}", entry.id, entry.category))
+                            .small()
+                            .color(MUTED),
+                    );
                     ui.add_space(6.0);
                     ui.heading(entry.subsystem);
                     ui.label(egui::RichText::new(entry.review).strong());
@@ -926,8 +1015,10 @@ impl CrimsonApp {
                     ui.label(egui::RichText::new("RECOMMENDED REVIEW").strong());
                     ui.label(entry.guidance);
                     ui.add_space(10.0);
-                    ui.colored_label(egui::Color32::from_rgb(245, 184, 66),
-                        "GUIDED TASK — this entry is not connected to Apply Selected.");
+                    ui.colored_label(
+                        egui::Color32::from_rgb(245, 184, 66),
+                        "GUIDED TASK — this entry is not connected to Apply Selected.",
+                    );
                 } else {
                     ui.label("Select an action from the list to inspect its target and guidance.");
                 }
