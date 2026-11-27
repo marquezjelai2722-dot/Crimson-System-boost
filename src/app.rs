@@ -948,9 +948,8 @@ impl CrimsonApp {
                     self.selected_tweaks = [false; 7];
                     self.selected_profile = "Custom";
                 }
-                if ui.button("Create Restore Point").clicked() {
-                    self.optimization_status = tweaks::create_restore_point()
-                        .unwrap_or_else(|error| format!("Restore point request failed: {error}"));
+                if ui.button("Restore & Undo").clicked() {
+                    self.page = Page::Restore;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.add_enabled(!self.optimization_running && selected_count > 0,
