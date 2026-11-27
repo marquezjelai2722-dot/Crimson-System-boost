@@ -50,7 +50,7 @@ impl Page {
         match self {
             Self::Dashboard => "Dashboard",
             Self::CpuGpu => "CPU & GPU",
-            Self::Windows => "Windows Tweaks",
+            Self::Windows => "Tweaks",
             Self::Startup => "Startup",
             Self::Services => "Services",
             Self::Debloat => "Optional Apps",
@@ -93,6 +93,8 @@ pub struct CrimsonApp {
     catalog_search: String,
     catalog_last_query: String,
     catalog_page: usize,
+    catalog_category: String,
+    selected_catalog_id: usize,
     network_host: String,
     network_result: String,
     startup_result: String,
@@ -196,6 +198,8 @@ impl Default for CrimsonApp {
             catalog_search: String::new(),
             catalog_last_query: String::new(),
             catalog_page: 0,
+            catalog_category: "All".to_owned(),
+            selected_catalog_id: 1,
             network_host: "example.com".to_owned(),
             network_result: "Run a DNS lookup and four-packet ping test against a hostname."
                 .to_owned(),
@@ -727,244 +731,343 @@ impl CrimsonApp {
     }
 
     fn windows_tweaks_page(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Choose your optimization profile");
-        ui.label(egui::RichText::new(
-            "Pick a starting selection, then review every tweak before applying. Profiles only select options; nothing changes until you press Apply.",
-        ).color(MUTED));
-        ui.add_space(8.0);
+        let entries = catalog::entries();
+        let cpu = self
+            .system
+            .cpus()
+            .iter()
+            .map(|core| core.cpu_usage())
+            .sum::<f32>()
+            / self.system.cpus().len().max(1) as f32;
+        let total_memory = self.system.total_memory();
+        let used_memory = self.system.used_memory();
+        let memory_percent = if total_memory > 0 {
+            used_memory as f32 / total_memory as f32 * 100.0
+        } else {
+            0.0
+        };
 
-        ui.horizontal_wrapped(|ui| {
-            if ui
-                .selectable_label(self.selected_profile == "Normal", "Normal")
-                .clicked()
-            {
-                self.selected_profile = "Normal";
-                self.selected_tweaks = [false, true, false, false, false, false, false];
-            }
-            if ui
-                .selectable_label(self.selected_profile == "Advanced", "Advanced")
-                .clicked()
-            {
-                self.selected_profile = "Advanced";
-                self.selected_tweaks = [true, true, true, true, true, false, false];
-            }
-            if ui
-                .selectable_label(
-                    self.selected_profile == "Max FPS for gaming",
-                    "Max FPS for gaming",
-                )
-                .clicked()
-            {
-                self.selected_profile = "Max FPS for gaming";
-                self.selected_tweaks = [true, true, true, true, false, false, false];
-            }
-            if ui
-                .selectable_label(
-                    self.selected_profile == "Everything safe",
-                    "Everything safe",
-                )
-                .clicked()
-            {
-                self.selected_profile = "Everything safe";
-                self.selected_tweaks = [true; 7];
-            }
-        });
-        ui.label(
-            egui::RichText::new(match self.selected_profile {
-                "Normal" => "A light baseline: Windows Game Mode only.",
-                "Advanced" => {
-                    "Selects the available gaming, visual, and consumer-experience tweaks."
-                }
-                "Max FPS for gaming" => {
-                    "Selects the available game-capture, Game Mode, and visual-effect options. No FPS gain is guaranteed."
-                }
-                "Everything safe" => {
-                    "Selects every currently available reversible tweak in this library."
-                }
-                _ => "Custom selection: choose individual tweaks below.",
-            })
-            .small()
-            .color(MUTED),
-        );
-        ui.add_space(12.0);
-
-        let selection_before_cards = self.selected_tweaks;
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
-                ui.heading("Tweak library");
-                ui.label(egui::RichText::new("Choose exactly which Windows settings to change. Every setting appears once.").color(MUTED));
+                ui.heading(
+                    egui::RichText::new("TWEAKS")
+                        .strong()
+                        .color(CRIMSON)
+                        .size(25.0),
+                );
+                ui.label(
+                    egui::RichText::new("Browse, review, and apply supported Windows changes.")
+                        .color(MUTED),
+                );
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let count = self.selected_tweaks.iter().filter(|selected| **selected).count();
-                ui.label(egui::RichText::new(format!("{count} selected")).strong().color(CRIMSON));
-            });
-        });
-        ui.add_space(14.0);
-        ui.columns(3, |columns| {
-            columns[0].vertical(|ui| {
-                tweak_category_header(ui, "GAMING", "Game capture and Windows game scheduling");
-                tweak_card(
-                    ui,
-                    &mut self.selected_tweaks,
-                    tweaks::TweakId::GameCaptureOff,
-                );
-                tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameModeOn);
-            });
-            columns[1].vertical(|ui| {
-                tweak_category_header(
-                    ui,
-                    "PERFORMANCE",
-                    "Windows visual effects and responsiveness",
-                );
-                tweak_card(
-                    ui,
-                    &mut self.selected_tweaks,
-                    tweaks::TweakId::TransparencyOff,
-                );
-                tweak_card(
-                    ui,
-                    &mut self.selected_tweaks,
-                    tweaks::TweakId::VisualEffectsPerformance,
-                );
-            });
-            columns[2].vertical(|ui| {
-                tweak_category_header(
-                    ui,
-                    "PRIVACY",
-                    "Optional suggestions and notification content",
-                );
-                tweak_card(
-                    ui,
-                    &mut self.selected_tweaks,
-                    tweaks::TweakId::DisableAppSuggestions,
-                );
-                tweak_card(
-                    ui,
-                    &mut self.selected_tweaks,
-                    tweaks::TweakId::DisableWindowsTips,
-                );
-                tweak_card(
-                    ui,
-                    &mut self.selected_tweaks,
-                    tweaks::TweakId::DisableConsumerFeatures,
+                ui.label(
+                    egui::RichText::new("500 GUIDED ACTIONS")
+                        .strong()
+                        .color(CRIMSON),
                 );
             });
         });
-        ui.add_space(18.0);
-        ui.separator();
-        ui.heading("500-item Windows action library");
-        ui.label(egui::RichText::new("500 uniquely named setting and maintenance targets across gaming, graphics, Windows, storage, and networking. Each has its own target and guidance; entries are not generic review-dimension duplicates. Important: this catalog is guidance-only for now. The seven individually tested settings above are the only entries currently wired to Apply and Undo.").color(MUTED));
-        ui.horizontal(|ui| {
-            ui.label("Search catalog");
-            ui.text_edit_singleline(&mut self.catalog_search);
-            if ui.button("Clear").clicked() {
-                self.catalog_search.clear();
-                self.catalog_page = 0;
+        ui.add_space(10.0);
+
+        egui::Frame::group(ui.style())
+            .fill(egui::Color32::from_rgb(28, 14, 23))
+            .stroke(egui::Stroke::new(1.0, CRIMSON))
+            .rounding(egui::Rounding::same(10.0))
+            .inner_margin(egui::Margin::same(12.0))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new("500 ACTION LIBRARY").strong().size(18.0));
+                        ui.label(egui::RichText::new("Five focused categories · searchable targets · individual guidance")
+                            .small().color(MUTED));
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(egui::RichText::new(format!("CPU  {cpu:.0}%")).strong().color(CRIMSON));
+                        ui.separator();
+                        ui.label(egui::RichText::new(format!("RAM  {memory_percent:.0}%")).strong().color(egui::Color32::from_rgb(95, 211, 145)));
+                    });
+                });
+            });
+
+        ui.add_space(10.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.label(egui::RichText::new("PROFILE").strong().color(MUTED));
+            for (name, selection) in [
+                ("Normal", [false, true, false, false, false, false, false]),
+                ("Advanced", [true, true, true, true, true, false, false]),
+                ("Max FPS", [true, true, true, true, false, false, false]),
+                ("Everything Safe", [true; 7]),
+            ] {
+                if ui
+                    .selectable_label(self.selected_profile == name, name)
+                    .clicked()
+                {
+                    self.selected_profile = name;
+                    self.selected_tweaks = selection;
+                }
             }
         });
+        ui.add_space(8.0);
+
+        let selection_before_cards = self.selected_tweaks;
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("READY-TO-APPLY TWEAKS")
+                        .strong()
+                        .color(CRIMSON),
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "Only these seven tested actions are currently executable.",
+                    )
+                    .small()
+                    .color(MUTED),
+                );
+            });
+            ui.columns(3, |columns| {
+                columns[0].vertical(|ui| {
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::GameCaptureOff,
+                    );
+                    tweak_card(ui, &mut self.selected_tweaks, tweaks::TweakId::GameModeOn);
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::TransparencyOff,
+                    );
+                });
+                columns[1].vertical(|ui| {
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::VisualEffectsPerformance,
+                    );
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::DisableAppSuggestions,
+                    );
+                });
+                columns[2].vertical(|ui| {
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::DisableWindowsTips,
+                    );
+                    tweak_card(
+                        ui,
+                        &mut self.selected_tweaks,
+                        tweaks::TweakId::DisableConsumerFeatures,
+                    );
+                });
+            });
+        });
+        if self.selected_tweaks != selection_before_cards {
+            self.selected_profile = "Custom";
+        }
+
+        ui.add_space(10.0);
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new("BROWSE ACTIONS")
+                    .strong()
+                    .color(CRIMSON),
+            );
+            ui.label(
+                egui::RichText::new(format!(
+                    "{} / {} entries",
+                    entries.len(),
+                    catalog::CATALOG_COUNT
+                ))
+                .small()
+                .color(MUTED),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.catalog_search)
+                        .hint_text("Search tweaks, subsystems, or guidance…")
+                        .desired_width(250.0),
+                );
+            });
+        });
+
         let query = self.catalog_search.trim().to_ascii_lowercase();
         if query != self.catalog_last_query {
             self.catalog_page = 0;
             self.catalog_last_query = query.clone();
         }
-        let entries = catalog::entries();
         let matching: Vec<_> = entries
             .iter()
             .filter(|entry| {
-                query.is_empty()
-                    || entry.subsystem.to_ascii_lowercase().contains(&query)
-                    || entry.category.to_ascii_lowercase().contains(&query)
-                    || entry.review.to_ascii_lowercase().contains(&query)
-                    || entry.guidance.to_ascii_lowercase().contains(&query)
+                (self.catalog_category == "All" || entry.category == self.catalog_category)
+                    && (query.is_empty()
+                        || entry.subsystem.to_ascii_lowercase().contains(&query)
+                        || entry.category.to_ascii_lowercase().contains(&query)
+                        || entry.review.to_ascii_lowercase().contains(&query)
+                        || entry.guidance.to_ascii_lowercase().contains(&query))
             })
             .collect();
-        ui.label(
-            egui::RichText::new(format!(
-                "{} / {} catalog entries",
-                matching.len(),
-                catalog::CATALOG_COUNT
-            ))
-            .strong()
-            .color(CRIMSON),
-        );
-        const CATALOG_PAGE_SIZE: usize = 30;
-        let page_count = matching.len().div_ceil(CATALOG_PAGE_SIZE).max(1);
-        self.catalog_page = self.catalog_page.min(page_count - 1);
-        ui.horizontal(|ui| {
-            if ui
-                .add_enabled(self.catalog_page > 0, egui::Button::new("Previous"))
-                .clicked()
-            {
-                self.catalog_page -= 1;
-            }
-            ui.label(format!("Page {} / {}", self.catalog_page + 1, page_count));
-            if ui
-                .add_enabled(
-                    self.catalog_page + 1 < page_count,
-                    egui::Button::new("Next"),
-                )
-                .clicked()
-            {
-                self.catalog_page += 1;
-            }
-        });
-        let start = self.catalog_page * CATALOG_PAGE_SIZE;
-        let end = (start + CATALOG_PAGE_SIZE).min(matching.len());
-        ui.label(format!(
-            "Showing {}–{} of {}",
-            if matching.is_empty() { 0 } else { start + 1 },
-            end,
-            matching.len()
-        ));
+
+        ui.add_space(8.0);
         ui.columns(3, |columns| {
-            for (index, entry) in matching[start..end].iter().enumerate() {
-                columns[index % 3].group(|ui| {
+            columns[0].group(|ui| {
+                ui.set_min_height(430.0);
+                ui.label(egui::RichText::new("CATEGORIES").strong().color(CRIMSON));
+                ui.add_space(6.0);
+                for category in ["All", "Gaming", "Graphics", "Windows", "Storage", "Network"] {
+                    let count = if category == "All" {
+                        entries.len()
+                    } else {
+                        entries
+                            .iter()
+                            .filter(|entry| entry.category == category)
+                            .count()
+                    };
+                    let label = format!("{category}  ({count})");
+                    if ui
+                        .selectable_label(self.catalog_category == category, label)
+                        .clicked()
+                    {
+                        self.catalog_category = category.to_owned();
+                        self.catalog_page = 0;
+                    }
+                }
+                ui.separator();
+                ui.label(egui::RichText::new("LIBRARY STATUS").strong().color(MUTED));
+                ui.label("500 uniquely named review targets.");
+                ui.label("Guided entries do not write to Windows.");
+                ui.label("Executable tweaks are listed above.");
+            });
+
+            columns[1].group(|ui| {
+                ui.set_min_height(430.0);
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("TWEAK LIST").strong());
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(egui::RichText::new(format!("{}", matching.len())).color(CRIMSON));
+                    });
+                });
+                const PAGE_SIZE: usize = 18;
+                let page_count = matching.len().div_ceil(PAGE_SIZE).max(1);
+                self.catalog_page = self.catalog_page.min(page_count - 1);
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(self.catalog_page > 0, egui::Button::new("‹"))
+                        .clicked()
+                    {
+                        self.catalog_page -= 1;
+                    }
+                    ui.label(format!("Page {} / {}", self.catalog_page + 1, page_count));
+                    if ui
+                        .add_enabled(self.catalog_page + 1 < page_count, egui::Button::new("›"))
+                        .clicked()
+                    {
+                        self.catalog_page += 1;
+                    }
+                });
+                let start = self.catalog_page * PAGE_SIZE;
+                let end = (start + PAGE_SIZE).min(matching.len());
+                egui::ScrollArea::vertical()
+                    .max_height(340.0)
+                    .show(ui, |ui| {
+                        if matching.is_empty() {
+                            ui.label("No matching actions. Try another search.");
+                        }
+                        for entry in &matching[start..end] {
+                            let selected = self.selected_catalog_id == entry.id;
+                            let response = ui.add_sized(
+                                [ui.available_width(), 48.0],
+                                egui::Button::new(
+                                    egui::RichText::new(format!(
+                                        "{}  {}",
+                                        entry.category, entry.review
+                                    ))
+                                    .size(12.0),
+                                )
+                                .selected(selected),
+                            );
+                            if response.clicked() {
+                                self.selected_catalog_id = entry.id;
+                            }
+                            ui.label(
+                                egui::RichText::new("GUIDED REVIEW · NOT AUTO-APPLIED")
+                                    .small()
+                                    .color(MUTED),
+                            );
+                        }
+                    });
+            });
+
+            columns[2].group(|ui| {
+                ui.set_min_height(430.0);
+                ui.label(
+                    egui::RichText::new("ACTION DETAILS")
+                        .strong()
+                        .color(CRIMSON),
+                );
+                if let Some(entry) = entries
+                    .iter()
+                    .find(|entry| entry.id == self.selected_catalog_id)
+                {
                     ui.label(
-                        egui::RichText::new(format!("#{:03}  {}", entry.id, entry.category))
-                            .strong(),
-                    );
-                    ui.label(egui::RichText::new(entry.review).color(CRIMSON).small());
-                    ui.label(egui::RichText::new(entry.guidance).small().color(MUTED));
-                    ui.label(
-                        egui::RichText::new("GUIDED TASK · NOT AUTO-APPLIED")
+                        egui::RichText::new(format!("#{:03} · {}", entry.id, entry.category))
                             .small()
                             .color(MUTED),
                     );
-                });
-            }
-        });
-        if self.selected_tweaks != selection_before_cards {
-            self.selected_profile = "Custom";
-        }
-        ui.add_space(12.0);
-        ui.separator();
-        ui.horizontal_wrapped(|ui| {
-            let mut apply = false;
-            let mut clear = false;
-            ui.add_enabled_ui(!self.optimization_running, |ui| {
-                apply = ui
-                    .button(egui::RichText::new("Apply selected tweaks").strong())
-                    .clicked();
-                clear = ui.button("Clear selection").clicked();
+                    ui.add_space(6.0);
+                    ui.heading(entry.subsystem);
+                    ui.label(egui::RichText::new(entry.review).strong());
+                    ui.separator();
+                    ui.label(egui::RichText::new("RECOMMENDED REVIEW").strong());
+                    ui.label(entry.guidance);
+                    ui.add_space(10.0);
+                    ui.colored_label(
+                        egui::Color32::from_rgb(245, 184, 66),
+                        "GUIDED TASK — this entry is not connected to Apply Selected.",
+                    );
+                } else {
+                    ui.label("Select an action from the list to inspect its target and guidance.");
+                }
             });
-            if apply {
-                self.start_selected_tweaks();
-            }
-            if clear {
-                self.selected_tweaks = [false; 7];
-                self.selected_profile = "Custom";
-            }
-            if ui.button("Undo last batch").clicked() && !self.optimization_running {
-                self.undo_latest_optimization();
-            }
+        });
+
+        ui.add_space(10.0);
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                let selected_count = self.selected_tweaks.iter().filter(|selected| **selected).count();
+                ui.label(egui::RichText::new(format!("SELECTED: {selected_count} executable tweaks"))
+                    .strong().color(CRIMSON));
+                if ui.button("Select all executable").clicked() {
+                    self.selected_tweaks = [true; 7];
+                    self.selected_profile = "Custom";
+                }
+                if ui.button("Deselect all").clicked() {
+                    self.selected_tweaks = [false; 7];
+                    self.selected_profile = "Custom";
+                }
+                if ui.button("Restore & Undo").clicked() {
+                    self.page = Page::Restore;
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.add_enabled(!self.optimization_running && selected_count > 0,
+                        egui::Button::new(egui::RichText::new("⚡ APPLY SELECTED").strong().color(egui::Color32::WHITE)))
+                        .clicked() {
+                        self.start_selected_tweaks();
+                    }
+                });
+            });
             if self.optimization_running {
                 ui.spinner();
                 ui.label("Applying and verifying selected settings…");
             }
+            ui.label(egui::RichText::new(&self.optimization_status).small().color(MUTED));
+            ui.label(egui::RichText::new("Changes are limited to the seven tested settings above. The 500-item catalog is reference guidance, not 500 automatic optimizations.")
+                .small().color(MUTED));
         });
-        ui.add_space(8.0);
-        ui.label(egui::RichText::new(&self.optimization_status).color(MUTED));
-        ui.label("Before changes, Crimson requests a Windows restore point and saves the exact original registry values. If verification fails, it attempts rollback. No Defender, Firewall, Windows Update, services, drivers, or installed apps are changed.");
     }
 
     fn startup_page(&mut self, ui: &mut egui::Ui) {
@@ -1174,7 +1277,7 @@ impl CrimsonApp {
                     .strong()
                     .color(MUTED),
             );
-            nav_item(ui, &mut self.page, Page::Windows, "Windows tweaks");
+            nav_item(ui, &mut self.page, Page::Windows, "Tweaks");
             nav_item(ui, &mut self.page, Page::Cleaner, "Temp cleaner");
             nav_item(ui, &mut self.page, Page::Startup, "Startup apps");
             nav_item(ui, &mut self.page, Page::Debloat, "Installed apps");
